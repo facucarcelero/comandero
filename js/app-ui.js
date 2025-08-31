@@ -39,10 +39,6 @@ function closePaymentModal(){
   const modal = document.getElementById('payment-modal');
   modal.classList.add('hidden');
 }
-      <div style="border-top:1px dashed #999; margin:6px 0;"></div>
-      <div>Pago: <strong>${(payMethod||'').toUpperCase()}</strong></div>
-    </div>`;
-}
 
 function buildKitchenTicketHTML(items, payMethod){
   const dt = new Date();
