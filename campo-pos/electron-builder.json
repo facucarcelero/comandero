@@ -1,0 +1,60 @@
+{
+  "appId": "com.birthday.pos",
+  "productName": "Birthday POS",
+  "directories": {
+    "output": "build"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "src/utils/**/*",
+    "db/**/*",
+    "build/renderer/**/*",
+    "!**/node_modules/**/*",
+    "!**/src/renderer/node_modules/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "db/init.sql",
+      "to": "db/init.sql"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icon.ico",
+    "publisherName": "Birthday POS",
+    "verifyUpdateCodeSignature": false
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64", "arm64"]
+      }
+    ],
+    "icon": "assets/icon.icns",
+    "category": "public.app-category.business"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icon.png",
+    "category": "Office"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Birthday POS"
+  }
+}
