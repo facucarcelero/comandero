@@ -1,6 +1,6 @@
 const escpos = require('escpos');
 const escposUSB = require('escpos-usb');
-const settings = require('./settings');
+const db = require('../db/database');
 
 let printer = null;
 let config = null;
@@ -8,19 +8,33 @@ let config = null;
 // Configurar impresora
 function setConfig(newConfig) {
   config = newConfig;
-  settings.set('impresora_config', newConfig);
+  db.setSetting('impresora_config', JSON.stringify(newConfig));
   return true;
 }
 
 // Obtener configuración
 function getConfig() {
   if (!config) {
-    config = settings.get('impresora_config') || {
-      tipo: 'usb',
-      puerto: '',
-      ancho: 58,
-      test_print: false
-    };
+    const configStr = db.getSetting('impresora_config');
+    if (configStr) {
+      try {
+        config = JSON.parse(configStr);
+      } catch (e) {
+        config = {
+          tipo: 'usb',
+          puerto: '',
+          ancho: 58,
+
+        };
+      }
+    } else {
+      config = {
+        tipo: 'usb',
+        puerto: '',
+        ancho: 58,
+
+      };
+    }
   }
   return config;
 }
@@ -55,12 +69,7 @@ function initPrinter() {
 // Test de impresión
 function testPrint() {
   try {
-    // En modo de desarrollo, simular impresión exitosa
     const config = getConfig();
-    if (config.test_print) {
-      console.log('🖨️ Simulando test de impresión...');
-      return true;
-    }
 
     if (!initPrinter()) {
       throw new Error('No se pudo inicializar la impresora');
@@ -96,17 +105,12 @@ function printKitchenTicket(ordenData) {
   try {
     // En modo de desarrollo, simular impresión exitosa
     const config = getConfig();
-    if (config.test_print) {
-      console.log('🖨️ Simulando impresión de comanda de cocina...');
-      console.log('🍽️ Datos de la orden:', ordenData);
-      return true;
-    }
 
     if (!initPrinter()) {
       throw new Error('No se pudo inicializar la impresora');
     }
 
-    const empresa = settings.get('empresa_nombre') || 'Mi Restaurante';
+    const empresa = db.getSetting('empresa_nombre') || 'Mi Restaurante';
     
     printer
       .font('a')
@@ -158,21 +162,16 @@ function printTicket(ordenData) {
   try {
     // En modo de desarrollo, simular impresión exitosa
     const config = getConfig();
-    if (config.test_print || !config.puerto) {
-      console.log('🖨️ Simulando impresión de ticket de venta...');
-      console.log('🧾 Datos de la orden:', ordenData);
-      return true;
-    }
 
     if (!initPrinter()) {
       console.log('No se pudo inicializar la impresora, simulando impresión...');
       return true;
     }
 
-    const empresa = settings.get('empresa_nombre') || 'Mi Restaurante';
-    const direccion = settings.get('empresa_direccion') || '';
-    const telefono = settings.get('empresa_telefono') || '';
-    const ruc = settings.get('empresa_ruc') || '';
+    const empresa = db.getSetting('empresa_nombre') || 'Mi Restaurante';
+    const direccion = db.getSetting('empresa_direccion') || '';
+    const telefono = db.getSetting('empresa_telefono') || '';
+    const ruc = db.getSetting('empresa_ruc') || '';
     
     printer
       .font('a')
@@ -266,17 +265,12 @@ function printCierreCaja(cajaData) {
   try {
     // En modo de desarrollo, simular impresión exitosa
     const config = getConfig();
-    if (config.test_print) {
-      console.log('🖨️ Simulando impresión de cierre de caja...');
-      console.log('💰 Datos de la caja:', cajaData);
-      return true;
-    }
 
     if (!initPrinter()) {
       throw new Error('No se pudo inicializar la impresora');
     }
 
-    const empresa = settings.get('empresa_nombre') || 'Mi Restaurante';
+    const empresa = db.getSetting('empresa_nombre') || 'Mi Restaurante';
     
     printer
       .font('a')
@@ -313,22 +307,74 @@ function printCierreCaja(cajaData) {
   }
 }
 
-// Imprimir reporte de ventas
-function printReporteVentas(reporteData) {
+// Imprimir resumen de caja
+function printResumenCaja(data) {
   try {
     // En modo de desarrollo, simular impresión exitosa
     const config = getConfig();
-    if (config.test_print) {
-      console.log('🖨️ Simulando impresión de reporte de ventas...');
-      console.log('📊 Datos del reporte:', reporteData);
-      return true;
-    }
 
     if (!initPrinter()) {
       throw new Error('No se pudo inicializar la impresora');
     }
 
-    const empresa = settings.get('empresa_nombre') || 'Mi Restaurante';
+    const empresa = db.getSetting('empresa_nombre') || 'Mi Restaurante';
+    const { caja, resumen, fecha } = data;
+    
+    printer
+      .font('a')
+      .align('ct')
+      .size(1, 1)
+      .text('RESUMEN DE CAJA')
+      .text('===============')
+      .feed(1)
+      .align('lt')
+      .text('Responsable: ' + caja.responsable)
+      .text('Fecha: ' + new Date(fecha).toLocaleDateString())
+      .text('Hora: ' + new Date(fecha).toLocaleTimeString())
+      .text('--------------------------------')
+      .feed(1)
+      .text('Monto Inicial: $' + caja.monto_inicial.toLocaleString())
+      .text('Total Ventas: $' + (resumen.total_ventas || 0).toLocaleString())
+      .text('Total Órdenes: ' + (resumen.total_ordenes || 0))
+      .text('--------------------------------')
+      .feed(1)
+      .text('MÉTODOS DE PAGO:')
+      .text('Efectivo: $' + (resumen.ventas_efectivo || 0).toLocaleString())
+      .text('Tarjeta: $' + (resumen.ventas_tarjeta || 0).toLocaleString())
+      .text('Transferencia: $' + (resumen.ventas_transferencia || 0).toLocaleString())
+      .text('--------------------------------')
+      .feed(1)
+      .text('ESTADO DE ÓRDENES:')
+      .text('Pendientes: ' + (resumen.ordenes_pendientes || 0))
+      .text('Preparando: ' + (resumen.ordenes_preparando || 0))
+      .text('Entregadas: ' + (resumen.ordenes_entregadas || 0))
+      .text('Canceladas: ' + (resumen.ordenes_canceladas || 0))
+      .text('--------------------------------')
+      .feed(2)
+      .align('ct')
+      .text('Gracias por su trabajo!')
+      .feed(2)
+      .cut();
+
+    printer.close();
+    return true;
+  } catch (error) {
+    console.error('Error al imprimir resumen de caja:', error);
+    return false;
+  }
+}
+
+// Imprimir reporte de ventas
+function printReporteVentas(reporteData) {
+  try {
+    // En modo de desarrollo, simular impresión exitosa
+    const config = getConfig();
+
+    if (!initPrinter()) {
+      throw new Error('No se pudo inicializar la impresora');
+    }
+
+    const empresa = db.getSetting('empresa_nombre') || 'Mi Restaurante';
     
     printer
       .font('a')
@@ -396,5 +442,6 @@ module.exports = {
   printKitchenTicket,
   printTicket,
   printCierreCaja,
+  printResumenCaja,
   printReporteVentas
 };

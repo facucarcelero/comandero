@@ -13,6 +13,7 @@
     "build": "rimraf renderer && npm run build:react && npm run build:electron",
     "start": "electron .",
     "dist": "npm run build",
+    "migrate": "node scripts/migrate.js",
     "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
@@ -48,6 +49,7 @@
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.1",
+    "sqlite3": "^5.1.6",
     "sweetalert2": "^11.10.3",
     "zustand": "^4.4.7"
   },
@@ -62,8 +64,7 @@
       "preload.js",
       "package.json",
       "renderer/**/*",
-      "src/utils/**/*",
-      "db/**/*",
+      "src/**/*",
       "node_modules/**/*"
     ],
     "extraResources": [
@@ -74,11 +75,13 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "node_modules/lowdb/**/*",
+      "node_modules/sqlite3/**/*",
       "node_modules/escpos/**/*",
       "node_modules/escpos-usb/**/*",
-      "src/utils/**/*"
+      "node_modules/usb/**/*",
+      "src/**/*"
     ],
+    "buildDependenciesFromSource": false,
     "win": {
       "target": "nsis"
     },

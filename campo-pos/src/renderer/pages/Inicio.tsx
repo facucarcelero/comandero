@@ -14,11 +14,10 @@ const Inicio: React.FC = () => {
   const validatePedido = useValidatePedido();
 
   // Usar el store centralizado solo para obtener datos
-  const { products, cash, config, forceSync } = useAppStore(state => ({
+  const { products, cash, config } = useAppStore(state => ({
     products: state.products,
     cash: state.cash,
-    config: state.config,
-    forceSync: state.forceSync
+    config: state.config
   }));
 
   const [categorias, setCategorias] = useState<string[]>([]);
@@ -108,8 +107,6 @@ const Inicio: React.FC = () => {
         
         // Limpiar pedido después de imprimir
         clearPedido();
-        // Recargar datos para actualizar stock
-        await forceSync();
       } else {
         throw new Error('Error al imprimir la comanda');
       }
@@ -193,8 +190,6 @@ const Inicio: React.FC = () => {
         
         // Limpiar pedido después del pago
         clearPedido();
-        // Recargar datos para actualizar stock
-        await forceSync();
       } else {
         throw new Error('Error al imprimir el ticket');
       }

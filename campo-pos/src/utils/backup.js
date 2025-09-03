@@ -1,8 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const db = require('./db');
-const settings = require('./settings');
+const db = require('../db/database');
 
 // Crear backup de la base de datos
 function createDatabaseBackup() {
@@ -55,7 +54,7 @@ function exportData(filePath = null) {
         export_date: new Date().toISOString(),
         app_name: 'Campo POS'
       },
-      settings: settings.getAll(),
+      settings: db.getAllSettings(),
       productos: db.getProductos(),
       ordenes: db.getOrdenes({ limit: 10000 }), // Límite para evitar archivos muy grandes
       caja: db.getResumenCaja(),
@@ -122,7 +121,9 @@ function importData(filePath) {
     
     // Importar configuraciones
     if (data.settings) {
-      settings.setMultiple(data.settings);
+      for (const setting of data.settings) {
+        db.setSetting(setting.key, setting.value);
+      }
     }
     
     // Importar productos
@@ -272,7 +273,10 @@ function cleanupOldBackups(daysToKeep = 30) {
 // Crear backup automático
 function createAutomaticBackup() {
   try {
-    const config = settings.getBackupConfig();
+    const config = {
+      automatico: db.getSetting('backup_automatico') === 'true',
+      retener_dias: parseInt(db.getSetting('backup_retener_dias')) || 30
+    };
     
     if (!config.automatico) {
       return { success: true, message: 'Backup automático deshabilitado' };

@@ -7,17 +7,16 @@
   "files": [
     "main.js",
     "preload.js",
+    "src/db/**/*",
     "src/utils/**/*",
-    "db/**/*",
-    "build/renderer/**/*",
+    "renderer/**/*",
     "!**/node_modules/**/*",
     "!**/src/renderer/node_modules/**/*"
   ],
-  "extraResources": [
-    {
-      "from": "db/init.sql",
-      "to": "db/init.sql"
-    }
+  "asarUnpack": [
+    "node_modules/better-sqlite3/**/*",
+    "node_modules/escpos/**/*",
+    "node_modules/escpos-usb/**/*"
   ],
   "win": {
     "target": [

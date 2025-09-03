@@ -4,10 +4,10 @@ const fs = require('fs');
 const isDev = process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL;
 
 // Importar módulos de utilidades
-const db = require('./src/utils/db');
-const printer = require('./src/utils/printer');
-const settings = require('./src/utils/settings');
-const backup = require('./src/utils/backup');
+const db = require(path.join(__dirname, 'src', 'db', 'database'));
+const dbInit = require(path.join(__dirname, 'src', 'db', 'index'));
+const printer = require(path.join(__dirname, 'src', 'utils', 'printer'));
+const backup = require(path.join(__dirname, 'src', 'utils', 'backup'));
 
 let mainWindow;
 
@@ -58,10 +58,10 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     console.log('✅ Ventana lista para mostrar');
     mainWindow.show();
-    // Solo abrir DevTools en modo desarrollo
-    if (isDev) {
-      mainWindow.webContents.openDevTools();
-    }
+    // DevTools solo se abren manualmente (F12 o Ctrl+Shift+I)
+    // if (isDev) {
+    //   mainWindow.webContents.openDevTools();
+    // }
   });
 
   mainWindow.on('closed', () => {
@@ -83,27 +83,237 @@ function createWindow() {
   });
 }
 
+// ===== HANDLERS IPC =====
+// Estos handlers se registran después de inicializar la base de datos
+
+function registerIpcHandlers() {
+  console.log('🔗 Registrando handlers IPC...');
+
+  // Settings
+  ipcMain.handle('settings:get', async (event, key) => {
+    return db.getSetting(key);
+  });
+
+  ipcMain.handle('settings:set', async (event, key, value) => {
+    const result = db.setSetting(key, value);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:settingsUpdated', { key, value });
+    }
+    return result;
+  });
+
+  ipcMain.handle('settings:all', async () => {
+    return db.getAllSettings();
+  });
+
+  // Caja
+  ipcMain.handle('caja:abrir', async (event, data) => {
+    const result = db.abrirCaja(data);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:cajaOpened', result);
+    }
+    return result;
+  });
+
+  ipcMain.handle('caja:estado', async () => {
+    return db.getCajaEstado();
+  });
+
+  ipcMain.handle('caja:cerrar', async (event, data) => {
+    const result = db.cerrarCaja(data);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:cajaClosed', data);
+    }
+    return result;
+  });
+
+  ipcMain.handle('caja:resumen-dia', async (event, fecha) => {
+    return db.getResumenCaja(fecha);
+  });
+
+  ipcMain.handle('caja:historial', async (event, fechaInicio, fechaFin) => {
+    return db.getHistorialCajas(fechaInicio, fechaFin);
+  });
+
+  // Productos
+  ipcMain.handle('producto:list', async (event, filtros = {}) => {
+    return db.getProductos(filtros);
+  });
+
+  ipcMain.handle('producto:create', async (event, producto) => {
+    const result = db.createProducto(producto);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:productoCreated', result);
+    }
+    return result;
+  });
+
+  ipcMain.handle('producto:update', async (event, id, producto) => {
+    const result = db.updateProducto(id, producto);
+    if (result && mainWindow) {
+      const updatedProducto = db.getProducto(id);
+      mainWindow.webContents.send('event:productoUpdated', updatedProducto);
+    }
+    return result;
+  });
+
+  ipcMain.handle('producto:delete', async (event, id) => {
+    const result = db.deleteProducto(id);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:productoDeleted', { id });
+    }
+    return result;
+  });
+
+  ipcMain.handle('producto:import', async (event, productos) => {
+    const result = db.importProductos(productos);
+    if (result > 0 && mainWindow) {
+      mainWindow.webContents.send('event:productosImported', { count: result });
+    }
+    return result;
+  });
+
+
+
+  // Órdenes y Pagos
+  ipcMain.handle('orden:create', async (event, orden) => {
+    const result = await db.createOrden(orden);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:ordenCreated', result);
+      
+      // Enviar eventos de productos actualizados (stock cambiado)
+      for (const item of orden.items) {
+        const producto = await db.getProducto(item.producto_id);
+        if (producto) {
+          mainWindow.webContents.send('event:productoUpdated', producto);
+        }
+      }
+    }
+    return result;
+  });
+
+  ipcMain.handle('orden:list', async (event, filtros = {}) => {
+    return db.getOrdenes(filtros);
+  });
+
+  ipcMain.handle('orden:changeStatus', async (event, id, estado) => {
+    const result = db.updateEstadoOrden(id, estado);
+    if (result && mainWindow) {
+      const orden = db.getOrden(id);
+      mainWindow.webContents.send('event:ordenUpdated', orden);
+    }
+    return result;
+  });
+
+  ipcMain.handle('orden:get', async (event, id) => {
+    return db.getOrden(id);
+  });
+
+  ipcMain.handle('orden:delete', async (event, id, motivo) => {
+    const result = db.deleteOrden(id, motivo);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:ordenDeleted', { id, motivo });
+    }
+    return result;
+  });
+
+  ipcMain.handle('pago:add', async (event, pago) => {
+    const result = db.addPago(pago);
+    if (result && mainWindow) {
+      mainWindow.webContents.send('event:pagoAdded', result);
+    }
+    return result;
+  });
+
+  ipcMain.handle('pago:list', async (event, ordenId) => {
+    return db.getPagos(ordenId);
+  });
+
+  // Reportes
+  ipcMain.handle('reportes:getVentasPorFecha', async (event, fechaInicio, fechaFin) => {
+    return db.getVentasPorFecha(fechaInicio, fechaFin);
+  });
+
+  ipcMain.handle('reportes:getVentasPorCategoria', async (event, fechaInicio, fechaFin) => {
+    return db.getVentasPorCategoria(fechaInicio, fechaFin);
+  });
+
+  ipcMain.handle('reportes:getProductosMasVendidos', async (event, fechaInicio, fechaFin, limit) => {
+    return db.getProductosMasVendidos(fechaInicio, fechaFin, limit);
+  });
+
+  // Impresora
+  ipcMain.handle('printer:config', async (event, config) => {
+    return printer.setConfig(config);
+  });
+
+  ipcMain.handle('printer:test', async () => {
+    return printer.testPrint();
+  });
+
+  ipcMain.handle('printer:printKitchen', async (event, ordenData) => {
+    return printer.printKitchenTicket(ordenData);
+  });
+
+  ipcMain.handle('printer:printTicket', async (event, ordenData) => {
+    return printer.printTicket(ordenData);
+  });
+
+  ipcMain.handle('printer:printClose', async (event, cajaData) => {
+    return printer.printCierreCaja(cajaData);
+  });
+
+  ipcMain.handle('printer:printResumenCaja', async (event, data) => {
+    return printer.printResumenCaja(data);
+  });
+
+  ipcMain.handle('printer:printReporteVentas', async (event, reporteData) => {
+    return printer.printReporteVentas(reporteData);
+  });
+
+  // Backup
+  ipcMain.handle('backup:export', async (event, filePath) => {
+    return backup.exportData(filePath);
+  });
+
+  ipcMain.handle('backup:import', async (event, filePath) => {
+    return backup.importData(filePath);
+  });
+
+  ipcMain.handle('backup:verify', async (event, filePath) => {
+    return backup.verifyBackup(filePath);
+  });
+
+  // Diálogos del sistema
+  ipcMain.handle('dialog:openFile', async (event, options) => {
+    const result = await dialog.showOpenDialog(mainWindow, options);
+    return result;
+  });
+
+  ipcMain.handle('dialog:saveFile', async (event, options) => {
+    const result = await dialog.showSaveDialog(mainWindow, options);
+    return result;
+  });
+
+  console.log('✅ Handlers IPC registrados correctamente');
+}
+
 // Inicializar la aplicación
 app.whenReady().then(async () => {
   console.log('🚀 Aplicación lista');
   
-  // Inicializar base de datos
-  console.log('🔧 Inicializando base de datos...');
+  // Inicializar base de datos SQLite PRIMERO
+  console.log('🔧 Inicializando base de datos SQLite...');
   try {
-    await db.init();
-    console.log('✅ Base de datos inicializada correctamente');
+    await dbInit.init();
+    console.log('✅ Base de datos SQLite inicializada correctamente');
   } catch (error) {
-    console.error('❌ Error al inicializar base de datos:', error);
+    console.error('❌ Error al inicializar base de datos SQLite:', error);
+    return; // No continuar si la base de datos no se puede inicializar
   }
   
-  // Inicializar configuraciones
-  console.log('🔧 Inicializando configuraciones...');
-  try {
-    await settings.initSettings();
-    console.log('✅ Configuraciones inicializadas correctamente');
-  } catch (error) {
-    console.error('❌ Error al inicializar configuraciones:', error);
-  }
+  // Registrar handlers IPC después de inicializar la base de datos
+  registerIpcHandlers();
   
   createWindow();
 
@@ -118,150 +328,6 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
-});
-
-// ===== HANDLERS IPC =====
-
-// Settings
-ipcMain.handle('settings:get', async (event, key) => {
-  return settings.get(key);
-});
-
-ipcMain.handle('settings:set', async (event, key, value) => {
-  return settings.set(key, value);
-});
-
-ipcMain.handle('settings:all', async () => {
-  return settings.getAll();
-});
-
-// Caja
-ipcMain.handle('caja:abrir', async (event, data) => {
-  return db.abrirCaja(data);
-});
-
-ipcMain.handle('caja:estado', async () => {
-  return db.getEstadoCaja();
-});
-
-ipcMain.handle('caja:cerrar', async (event, data) => {
-  return db.cerrarCaja(data);
-});
-
-ipcMain.handle('caja:resumen-dia', async (event, fecha) => {
-  return db.getResumenCaja(fecha);
-});
-
-// Productos
-ipcMain.handle('producto:list', async (event, filtros = {}) => {
-  return db.getProductos(filtros);
-});
-
-ipcMain.handle('producto:create', async (event, producto) => {
-  return db.createProducto(producto);
-});
-
-ipcMain.handle('producto:update', async (event, id, producto) => {
-  return db.updateProducto(id, producto);
-});
-
-ipcMain.handle('producto:delete', async (event, id) => {
-  return db.deleteProducto(id);
-});
-
-ipcMain.handle('producto:import', async (event, productos) => {
-  return db.importProductos(productos);
-});
-
-// Órdenes y Pagos
-ipcMain.handle('orden:create', async (event, orden) => {
-  return db.createOrden(orden);
-});
-
-ipcMain.handle('orden:list', async (event, filtros = {}) => {
-  return db.getOrdenes(filtros);
-});
-
-ipcMain.handle('orden:changeStatus', async (event, id, estado) => {
-  return db.updateEstadoOrden(id, estado);
-});
-
-ipcMain.handle('orden:get', async (event, id) => {
-  return db.getOrden(id);
-});
-
-ipcMain.handle('orden:delete', async (event, id, motivo) => {
-  return db.deleteOrden(id, motivo);
-});
-
-ipcMain.handle('pago:add', async (event, pago) => {
-  return db.addPago(pago);
-});
-
-ipcMain.handle('pago:list', async (event, ordenId) => {
-  return db.getPagos(ordenId);
-});
-
-// Reportes
-ipcMain.handle('reportes:getVentasPorFecha', async (event, fechaInicio, fechaFin) => {
-  return db.getVentasPorFecha(fechaInicio, fechaFin);
-});
-
-ipcMain.handle('reportes:getVentasPorCategoria', async (event, fechaInicio, fechaFin) => {
-  return db.getVentasPorCategoria(fechaInicio, fechaFin);
-});
-
-ipcMain.handle('reportes:getProductosMasVendidos', async (event, fechaInicio, fechaFin, limit) => {
-  return db.getProductosMasVendidos(fechaInicio, fechaFin, limit);
-});
-
-// Impresora
-ipcMain.handle('printer:config', async (event, config) => {
-  return printer.setConfig(config);
-});
-
-ipcMain.handle('printer:test', async () => {
-  return printer.testPrint();
-});
-
-ipcMain.handle('printer:printKitchen', async (event, ordenData) => {
-  return printer.printKitchenTicket(ordenData);
-});
-
-ipcMain.handle('printer:printTicket', async (event, ordenData) => {
-  return printer.printTicket(ordenData);
-});
-
-ipcMain.handle('printer:printClose', async (event, cajaData) => {
-  return printer.printCierreCaja(cajaData);
-});
-
-ipcMain.handle('printer:printReporteVentas', async (event, reporteData) => {
-  return printer.printReporteVentas(reporteData);
-});
-
-// Backup
-ipcMain.handle('backup:export', async (event, filePath) => {
-  return backup.exportData(filePath);
-});
-
-ipcMain.handle('backup:import', async (event, filePath) => {
-  return backup.importData(filePath);
-});
-
-ipcMain.handle('backup:verify', async (event, filePath) => {
-  return backup.verifyBackup(filePath);
-});
-
-// Diálogos del sistema
-ipcMain.handle('dialog:openFile', async (event, options) => {
-  const result = await dialog.showOpenDialog(mainWindow, options);
-  return result;
-});
-
-ipcMain.handle('dialog:saveFile', async (event, options) => {
-  const result = await dialog.showSaveDialog(mainWindow, options);
-  return result;
 });
 
 // Manejo de errores

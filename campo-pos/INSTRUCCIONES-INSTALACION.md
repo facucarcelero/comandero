@@ -1,71 +1,140 @@
-# 📦 Campo POS - Instrucciones de Instalación
+# 🏪 Campo POS - Instalador v1.0.0
 
-## 🚀 Instalación Rápida
+## 📋 **Instrucciones de Instalación**
 
-### Paso 1: Descargar el Instalador
-- Descarga el archivo: `Campo POS Setup 1.0.0.exe`
-- Tamaño: ~86 MB
-
-### Paso 2: Ejecutar el Instalador
-1. **Haz doble clic** en `Campo POS Setup 1.0.0.exe`
-2. **Windows Defender** puede mostrar una advertencia (es normal)
-   - Haz clic en **"Más información"**
-   - Luego en **"Ejecutar de todas formas"**
-3. **Sigue el asistente de instalación:**
-   - Selecciona la carpeta de instalación (por defecto: `C:\Users\[Usuario]\AppData\Local\Programs\Campo POS`)
-   - Marca las opciones que desees:
-     - ✅ Crear acceso directo en el escritorio
-     - ✅ Crear entrada en el menú inicio
-   - Haz clic en **"Instalar"**
-
-### Paso 3: Ejecutar la Aplicación
-1. **Desde el escritorio:** Haz doble clic en el icono "Campo POS"
-2. **Desde el menú inicio:** Busca "Campo POS" y haz clic
-3. **Primera ejecución:** La aplicación puede tardar unos segundos en cargar
-
-## ✅ Verificación de Instalación
-
-### ¿Funciona correctamente?
-- ✅ Se abre la ventana de Campo POS
-- ✅ Se ve el sidebar con navegación
-- ✅ Se ve el área principal con productos
-- ✅ No hay errores en pantalla
-
-### ¿Problemas comunes?
-- **"Windows protegió tu PC"**: Haz clic en "Más información" → "Ejecutar de todas formas"
-- **"No se puede abrir"**: Verifica que tengas permisos de administrador
-- **"Error de instalación"**: Ejecuta como administrador
-
-## 🔧 Características de la Aplicación
-
-### Funcionalidades Principales:
-- 🏠 **Inicio**: Comandero principal con productos
-- 📦 **Inventario**: Gestión de productos y stock
-- 📋 **Pedidos**: Historial de órdenes
-- 💰 **Caja**: Apertura/cierre de caja
-- 📊 **Reportes**: Estadísticas y ventas
-- ⚙️ **Configuración**: Ajustes del sistema
-
-### Requisitos del Sistema:
-- **Sistema Operativo**: Windows 10/11 (64-bit)
-- **Memoria RAM**: Mínimo 4GB
-- **Espacio en disco**: 200MB libres
-- **Conexión**: No requiere internet (funciona offline)
-
-## 🆘 Soporte Técnico
-
-### Si tienes problemas:
-1. **Reinicia** la aplicación
-2. **Ejecuta como administrador**
-3. **Verifica** que Windows Defender no esté bloqueando
-4. **Contacta** al desarrollador con detalles del error
-
-### Información del Sistema:
-- **Versión**: Campo POS 1.0.0
-- **Plataforma**: Windows x64
-- **Fecha de compilación**: $(Get-Date -Format "dd/MM/yyyy")
+### **Requisitos del Sistema:**
+- ✅ **Windows 10** o superior (64-bit)
+- ✅ **4GB RAM** mínimo (8GB recomendado)
+- ✅ **100MB** espacio libre en disco
+- ✅ **Conexión a internet** solo para la primera instalación
 
 ---
-**¡Campo POS está listo para usar!** 🎉
 
-*Sistema de Punto de Venta offline desarrollado con Electron y React*
+## 🚀 **Proceso de Instalación**
+
+### **Paso 1: Preparar el Sistema**
+1. **Cerrar** cualquier instancia de Campo POS que esté ejecutándose
+2. Si no responde, abrir **Administrador de Tareas** (Ctrl+Shift+Esc)
+3. Buscar "Campo POS" en la pestaña **Procesos**
+4. **Finalizar** el proceso si existe
+
+### **Paso 2: Instalar Campo POS**
+1. **Extraer** el archivo ZIP:
+   - Hacer clic derecho en el ZIP → "Extraer todo..."
+   - O hacer clic en "Extraer todos" cuando aparezca la advertencia
+   - Elegir una carpeta (recomendado: Escritorio)
+2. **Buscar** el archivo `Campo POS Setup 1.0.0.exe` en la carpeta extraída
+3. **Hacer clic derecho** en `Campo POS Setup 1.0.0.exe` → "Ejecutar como administrador"
+3. **Seguir** el asistente de instalación:
+   - Elegir directorio de instalación
+   - Crear acceso directo en escritorio
+   - Crear entrada en menú inicio
+4. **Esperar** a que termine la instalación
+
+### **Paso 3: Primera Configuración**
+1. **Abrir** Campo POS desde el escritorio
+2. **Configurar empresa** (nombre, dirección, teléfono, etc.)
+3. **Establecer IVA** y moneda (por defecto: 0% IVA, ARS)
+4. **Configurar impresora** térmica (USB, Ethernet o Bluetooth)
+5. **Agregar productos** al inventario
+6. **Abrir caja** para comenzar a usar
+
+---
+
+## ⚙️ **Configuración de Impresora**
+
+### **Impresoras Compatibles:**
+- ✅ **Epson TM-T20, TM-T82, TM-T88V**
+- ✅ **Star TSP143, TSP650**
+- ✅ **Bixolon SRP-350, SRP-330**
+- ✅ **Citizen CT-S310**
+
+### **Configuración Recomendada:**
+- **Ancho:** 58mm (estándar)
+- **Velocidad:** 9600 baud
+- **Codificación:** UTF-8
+- **Puerto Ethernet:** 9100
+
+---
+
+## 🗄️ **Base de Datos**
+
+### **Ubicación:**
+- **Windows:** `C:\Users\[Usuario]\AppData\Roaming\campo-pos\data.db`
+- **Datos completamente aislados** por usuario
+- **Respaldos automáticos** incluidos
+
+### **Características:**
+- ✅ **Base de datos real** (no datos de ejemplo)
+- ✅ **Migraciones automáticas** al instalar
+- ✅ **Datos persistentes** entre reinicios
+- ✅ **Respaldos automáticos** diarios
+
+---
+
+## 🆘 **Solución de Problemas**
+
+### **⚠️ Advertencia: "Esta aplicación puede depender de otros archivos comprimidos"**
+**Solución:** 
+- **NO ejecutar** el instalador directamente desde el ZIP
+- **Siempre extraer** primero el archivo ZIP
+- **Hacer clic en "Extraer todos"** cuando aparezca la advertencia
+- **Ejecutar** el instalador desde la carpeta extraída
+
+### **Error: "No se puede cerrar Campo POS"**
+1. Abrir **Administrador de Tareas**
+2. Buscar "Campo POS" en **Procesos**
+3. **Finalizar** el proceso
+4. **Reintentar** la instalación
+
+### **Error: "Cannot find module"**
+- **Reinstalar** Campo POS completamente
+- **Eliminar** carpeta `%APPDATA%\campo-pos`
+- **Ejecutar** instalador como administrador
+
+### **Impresora no funciona:**
+1. **Verificar** que el driver esté instalado
+2. **Probar** con "Modo de Prueba" activado
+3. **Revisar** configuración de puerto/IP
+4. **Reiniciar** Campo POS
+
+---
+
+## 📞 **Soporte Técnico**
+
+### **Información del Sistema:**
+- **Versión:** Campo POS v1.0.0
+- **Base de datos:** SQLite3
+- **Framework:** Electron + React
+- **Compatibilidad:** Windows 10+
+
+### **Archivos de Log:**
+- **Ubicación:** `%APPDATA%\campo-pos\logs\`
+- **Útil para** diagnóstico de problemas
+
+---
+
+## ✅ **Verificación de Instalación**
+
+### **Después de instalar, verificar:**
+1. ✅ **Campo POS se abre** sin errores
+2. ✅ **Base de datos se crea** automáticamente
+3. ✅ **Configuración se guarda** correctamente
+4. ✅ **Impresora responde** a pruebas
+5. ✅ **Productos se pueden** agregar
+6. ✅ **Caja se puede** abrir/cerrar
+
+---
+
+## 🎯 **Primeros Pasos**
+
+1. **Configurar empresa** en Configuración → Empresa
+2. **Establecer IVA** en Configuración → Fiscal
+3. **Configurar impresora** en Configuración → Impresora
+4. **Agregar productos** en Inventario
+5. **Abrir caja** en Caja
+6. **Comenzar a tomar** pedidos en Inicio
+
+---
+
+**¡Campo POS está listo para usar! 🎉**

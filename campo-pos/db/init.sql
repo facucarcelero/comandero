@@ -98,15 +98,6 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 ('impresora_tipo', 'usb'),
 ('impresora_puerto', ''),
 ('impresora_ancho', '58'),
-('impresora_test_print', 'false');
+;
 
--- Productos de ejemplo
-INSERT OR IGNORE INTO productos (nombre, categoria, precio, stock) VALUES 
-('Hamburguesa Clásica', 'Hamburguesas', 15000, 50),
-('Hamburguesa Especial', 'Hamburguesas', 18000, 30),
-('Papas Fritas', 'Acompañamientos', 5000, 100),
-('Coca Cola', 'Bebidas', 3000, 200),
-('Agua', 'Bebidas', 2000, 150),
-('Ensalada César', 'Ensaladas', 12000, 25),
-('Pizza Margherita', 'Pizzas', 20000, 20),
-('Pizza Pepperoni', 'Pizzas', 22000, 20);
+

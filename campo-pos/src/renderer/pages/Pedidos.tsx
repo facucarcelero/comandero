@@ -206,12 +206,12 @@ const Pedidos: React.FC = () => {
     switch (estado) {
       case 'pendiente':
         return 'bg-warning';
-      case 'completado':
+      case 'preparando':
+        return 'bg-info';
+      case 'entregada':
         return 'bg-success';
-      case 'cancelado':
+      case 'cancelada':
         return 'bg-danger';
-      case 'eliminada':
-        return 'bg-secondary';
       default:
         return 'bg-secondary';
     }
@@ -271,8 +271,9 @@ const Pedidos: React.FC = () => {
               >
                 <option value="">Todos los estados</option>
                 <option value="pendiente">Pendiente</option>
-                <option value="completado">Completado</option>
-                <option value="cancelado">Cancelado</option>
+                <option value="preparando">Preparando</option>
+                <option value="entregada">Entregada</option>
+                <option value="cancelada">Cancelada</option>
               </select>
             </div>
             <div className="col-md-3">
@@ -391,8 +392,8 @@ const Pedidos: React.FC = () => {
                         {orden.estado === 'pendiente' && (
                           <button
                             className="btn btn-outline-success btn-sm"
-                            onClick={() => handleCambiarEstado(orden, 'completado')}
-                            title="Marcar como completado"
+                            onClick={() => handleCambiarEstado(orden, 'preparando')}
+                            title="Marcar como preparando"
                           >
                             <i className="bi bi-check"></i>
                           </button>
@@ -400,10 +401,19 @@ const Pedidos: React.FC = () => {
                         {orden.estado === 'pendiente' && (
                           <button
                             className="btn btn-outline-danger btn-sm"
-                            onClick={() => handleCambiarEstado(orden, 'cancelado')}
+                            onClick={() => handleCambiarEstado(orden, 'cancelada')}
                             title="Cancelar orden"
                           >
                             <i className="bi bi-x"></i>
+                          </button>
+                        )}
+                        {orden.estado === 'preparando' && (
+                          <button
+                            className="btn btn-outline-success btn-sm"
+                            onClick={() => handleCambiarEstado(orden, 'entregada')}
+                            title="Marcar como entregada"
+                          >
+                            <i className="bi bi-check-circle"></i>
                           </button>
                         )}
                         <button

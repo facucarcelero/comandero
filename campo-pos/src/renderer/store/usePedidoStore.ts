@@ -48,7 +48,7 @@ interface PedidoState {
 }
 
 // Función para calcular totales
-const calculateTotals = (items: OrdenItem[], ivaPercentage: number = 0.19) => {
+const calculateTotals = (items: OrdenItem[], ivaPercentage: number = 0) => {
   const subtotal = items.reduce((total, item) => total + item.subtotal, 0);
   const iva = Math.round(subtotal * ivaPercentage);
   const total = subtotal + iva;

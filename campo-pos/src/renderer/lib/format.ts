@@ -20,12 +20,14 @@ export const formatCurrency = (amount: number, currency = 'ARS'): string => {
 };
 
 export const formatNumber = (number: number): string => {
-  return new Intl.NumberFormat('es-CO').format(number);
+  return new Intl.NumberFormat('es-AR').format(number);
 };
 
 export const formatDate = (date: string | Date): string => {
+  if (!date) return 'N/A';
   const d = new Date(date);
-  return d.toLocaleDateString('es-CO', {
+  if (isNaN(d.getTime())) return 'Fecha inválida';
+  return d.toLocaleDateString('es-AR', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -35,8 +37,10 @@ export const formatDate = (date: string | Date): string => {
 };
 
 export const formatDateOnly = (date: string | Date): string => {
+  if (!date) return 'N/A';
   const d = new Date(date);
-  return d.toLocaleDateString('es-CO', {
+  if (isNaN(d.getTime())) return 'Fecha inválida';
+  return d.toLocaleDateString('es-AR', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -44,16 +48,20 @@ export const formatDateOnly = (date: string | Date): string => {
 };
 
 export const formatTime = (date: string | Date): string => {
+  if (!date) return 'N/A';
   const d = new Date(date);
-  return d.toLocaleTimeString('es-CO', {
+  if (isNaN(d.getTime())) return 'Hora inválida';
+  return d.toLocaleTimeString('es-AR', {
     hour: '2-digit',
     minute: '2-digit'
   });
 };
 
 export const formatDateTime = (date: string | Date): string => {
+  if (!date) return 'N/A';
   const d = new Date(date);
-  return d.toLocaleString('es-CO', {
+  if (isNaN(d.getTime())) return 'Fecha inválida';
+  return d.toLocaleString('es-AR', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -142,9 +150,9 @@ export const formatTableNumber = (mesa: string | number): string => {
 export const formatStatus = (status: string): string => {
   const statusMap: Record<string, string> = {
     pendiente: 'Pendiente',
-    completado: 'Completado',
-    cancelado: 'Cancelado',
-    eliminada: 'Eliminada',
+    preparando: 'Preparando',
+    entregada: 'Entregada',
+    cancelada: 'Cancelada',
     abierta: 'Abierta',
     cerrada: 'Cerrada'
   };

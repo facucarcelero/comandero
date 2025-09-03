@@ -310,6 +310,8 @@ const Inventario: React.FC = () => {
     }
   };
 
+
+
   // Filtrar productos
   const productosFiltrados = productos.filter(producto => {
     const matchesCategoria = !filtros.categoria || producto.categoria === filtros.categoria;

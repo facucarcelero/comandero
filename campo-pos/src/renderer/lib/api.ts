@@ -44,6 +44,10 @@ class ApiWrapper {
     return this.handleRequest(() => window.api.caja.resumenDia(fecha));
   }
 
+  async getHistorialCajas(fechaInicio: string, fechaFin: string): Promise<any[]> {
+    return this.handleRequest(() => window.api.caja.historial(fechaInicio, fechaFin));
+  }
+
   // Productos
   async getProductos(filtros?: any): Promise<Producto[]> {
     return this.handleRequest(() => window.api.productos.list(filtros));
@@ -127,6 +131,10 @@ class ApiWrapper {
 
   async printCierreCaja(cajaData: any): Promise<boolean> {
     return this.handleRequest(() => window.api.printer.printClose(cajaData));
+  }
+
+  async printResumenCaja(data: any): Promise<boolean> {
+    return this.handleRequest(() => window.api.printer.printResumenCaja(data));
   }
 
   async printReporteVentas(reporteData: any): Promise<boolean> {

@@ -60,7 +60,7 @@ export interface ConfiguracionImpresora {
   tipo: 'usb' | 'ethernet';
   puerto: string;
   ancho: 58 | 80;
-  test_print: boolean;
+
 }
 
 export interface ConfiguracionEmpresa {

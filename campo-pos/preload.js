@@ -14,7 +14,8 @@ contextBridge.exposeInMainWorld('api', {
     abrir: (data) => ipcRenderer.invoke('caja:abrir', data),
     estado: () => ipcRenderer.invoke('caja:estado'),
     cerrar: (data) => ipcRenderer.invoke('caja:cerrar', data),
-    resumenDia: (fecha) => ipcRenderer.invoke('caja:resumen-dia', fecha)
+    resumenDia: (fecha) => ipcRenderer.invoke('caja:resumen-dia', fecha),
+    historial: (fechaInicio, fechaFin) => ipcRenderer.invoke('caja:historial', fechaInicio, fechaFin)
   },
 
   // Productos
@@ -55,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
     printKitchen: (ordenData) => ipcRenderer.invoke('printer:printKitchen', ordenData),
     printTicket: (ordenData) => ipcRenderer.invoke('printer:printTicket', ordenData),
     printClose: (cajaData) => ipcRenderer.invoke('printer:printClose', cajaData),
+    printResumenCaja: (data) => ipcRenderer.invoke('printer:printResumenCaja', data),
     printReporteVentas: (reporteData) => ipcRenderer.invoke('printer:printReporteVentas', reporteData)
   },
 
@@ -69,6 +71,33 @@ contextBridge.exposeInMainWorld('api', {
   dialog: {
     openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
     saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options)
+  },
+
+  // Eventos push (del main al renderer)
+  events: {
+    // Settings
+    onSettingsUpdated: (callback) => ipcRenderer.on('event:settingsUpdated', callback),
+    
+    // Caja
+    onCajaOpened: (callback) => ipcRenderer.on('event:cajaOpened', callback),
+    onCajaClosed: (callback) => ipcRenderer.on('event:cajaClosed', callback),
+    
+    // Productos
+    onProductoCreated: (callback) => ipcRenderer.on('event:productoCreated', callback),
+    onProductoUpdated: (callback) => ipcRenderer.on('event:productoUpdated', callback),
+    onProductoDeleted: (callback) => ipcRenderer.on('event:productoDeleted', callback),
+    onProductosImported: (callback) => ipcRenderer.on('event:productosImported', callback),
+    
+    // Órdenes
+    onOrdenCreated: (callback) => ipcRenderer.on('event:ordenCreated', callback),
+    onOrdenUpdated: (callback) => ipcRenderer.on('event:ordenUpdated', callback),
+    onOrdenDeleted: (callback) => ipcRenderer.on('event:ordenDeleted', callback),
+    
+    // Pagos
+    onPagoAdded: (callback) => ipcRenderer.on('event:pagoAdded', callback),
+    
+    // Limpiar listeners
+    removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
   }
 });
 

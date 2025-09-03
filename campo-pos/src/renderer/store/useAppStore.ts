@@ -24,18 +24,25 @@ export type AppState = {
   cash: Caja | null;
   config: ConfigState;
   products: Producto[];
+  resumen: any;
   isLoading: boolean;
   lastUpdate: number;
   
   // Actions
   loadAll: () => Promise<void>;
-  forceSync: () => Promise<void>;
   setVAT: (rate: number) => Promise<void>;
   setCurrency: (currency: string, symbol: string) => Promise<void>;
-  openCash: (payload: { monto_inicial: number; responsable: string }) => Promise<void>;
+  openCash: (payload: { monto_inicial: number; responsable: string; fecha_apertura: string }) => Promise<void>;
   closeCash: (payload: { monto_final: number }) => Promise<void>;
   createOrder: (items: OrderItem[], mesa?: string, cliente?: string, observaciones?: string) => Promise<Orden>;
+  loadResumenDia: () => Promise<void>;
   setLoading: (loading: boolean) => void;
+  
+  // Event handlers (para eventos push)
+  setCash: (cash: Caja | null) => void;
+  setConfig: (config: ConfigState) => void;
+  setProducts: (products: Producto[]) => void;
+  setResumen: (resumen: any) => void;
 };
 
 // Función para comparar objetos
@@ -47,8 +54,9 @@ export const useAppStore = create<AppState>()(
   subscribeWithSelector((set, get) => ({
     // Estado inicial
     cash: null,
-    config: { vatRate: 0.19, currency: 'ARS', currencySymbol: '$' },
+    config: { vatRate: 0, currency: 'ARS', currencySymbol: '$' },
     products: [],
+    resumen: null,
     isLoading: false,
     lastUpdate: 0,
 
@@ -66,7 +74,7 @@ export const useAppStore = create<AppState>()(
         // Procesar configuraciones - asegurar que settings es un array
         const settingsArray = Array.isArray(settings) ? settings : [];
         
-        const ivaValue = settingsArray.find(s => s.key === 'iva_porcentaje')?.value || 19;
+        const ivaValue = settingsArray.find(s => s.key === 'iva_porcentaje')?.value || 0;
         const config: ConfigState = {
           vatRate: typeof ivaValue === 'number' && ivaValue > 1 ? ivaValue / 100 : ivaValue,
           currency: settingsArray.find(s => s.key === 'moneda')?.value || 'ARS',
@@ -89,36 +97,7 @@ export const useAppStore = create<AppState>()(
       }
     },
 
-    // Sincronización forzada (sin throttling)
-    forceSync: async () => {
-      try {
-        set({ isLoading: true });
-        const [cashState, settings, products] = await Promise.all([
-          api.getEstadoCaja(),
-          api.getAllSettings(),
-          api.getProductos()
-        ]);
 
-        const settingsArray = Array.isArray(settings) ? settings : [];
-        const ivaValue = settingsArray.find(s => s.key === 'iva_porcentaje')?.value || 19;
-        const config: ConfigState = {
-          vatRate: typeof ivaValue === 'number' && ivaValue > 1 ? ivaValue / 100 : ivaValue,
-          currency: settingsArray.find(s => s.key === 'moneda')?.value || 'ARS',
-          currencySymbol: settingsArray.find(s => s.key === 'moneda_simbolo')?.value || '$'
-        };
-
-        set({ 
-          cash: cashState, 
-          config, 
-          products, 
-          lastUpdate: Date.now(),
-          isLoading: false 
-        });
-      } catch (error) {
-        console.error('Error en sincronización forzada:', error);
-        set({ isLoading: false });
-      }
-    },
 
     // Establecer IVA
     setVAT: async (rate: number) => {
@@ -148,7 +127,7 @@ export const useAppStore = create<AppState>()(
     },
 
     // Abrir caja
-    openCash: async (payload: { monto_inicial: number; responsable: string }) => {
+    openCash: async (payload: { monto_inicial: number; responsable: string; fecha_apertura: string }) => {
       const cashData = await api.abrirCaja(payload);
       set({ cash: cashData });
     },
@@ -156,7 +135,19 @@ export const useAppStore = create<AppState>()(
     // Cerrar caja
     closeCash: async (payload: { monto_final: number }) => {
       await api.cerrarCaja(payload);
-      set({ cash: null });
+      set({ cash: null, resumen: null });
+    },
+
+    // Cargar resumen del día
+    loadResumenDia: async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const resumen = await api.getResumenCaja(today);
+        set({ resumen, lastUpdate: Date.now() });
+      } catch (error) {
+        console.error('Error loading resumen del día:', error);
+        set({ resumen: null });
+      }
     },
 
     // Crear orden
@@ -189,15 +180,29 @@ export const useAppStore = create<AppState>()(
 
       const ordenCreada = await api.createOrden(orden);
       
-      // Recargar datos para actualizar stock y estado
-      await get().loadAll();
-      
       return ordenCreada;
     },
 
     // Establecer loading
     setLoading: (loading: boolean) => {
       set({ isLoading: loading });
+    },
+
+    // Event handlers (para eventos push)
+    setCash: (cash: Caja | null) => {
+      set({ cash, lastUpdate: Date.now() });
+    },
+
+    setConfig: (config: ConfigState) => {
+      set({ config, lastUpdate: Date.now() });
+    },
+
+    setProducts: (products: Producto[]) => {
+      set({ products, lastUpdate: Date.now() });
+    },
+
+    setResumen: (resumen: any) => {
+      set({ resumen, lastUpdate: Date.now() });
     }
   }))
 );
