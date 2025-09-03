@@ -1,10 +1,29 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { usePedidoSelectors, usePedidoActions } from '../store/usePedidoStore';
+import { useAppStore } from '../store/useAppStore';
 import { formatCurrency } from '../lib/format';
 
-const PedidoActual: React.FC = () => {
-  const { items, mesa, cliente, subtotal, iva, total, itemCount } = usePedidoSelectors();
-  const { removeItem, updateItemQuantity, updateItemObservations, clearPedido } = usePedidoActions();
+interface PedidoActualProps {
+  onImprimirComanda?: () => void;
+  onPagar?: () => void;
+}
+
+const PedidoActual: React.FC<PedidoActualProps> = ({ onImprimirComanda, onPagar }) => {
+  const { items, mesa, cliente, observaciones, subtotal, iva, total, itemCount } = usePedidoSelectors();
+  const { removeItem, updateItemQuantity, updateItemObservations, setMesa, setCliente, setObservaciones, clearPedido, recalculateTotals } = usePedidoActions();
+  
+  // Obtener configuración del IVA del store centralizado
+  const { config, cash } = useAppStore(state => ({
+    config: state.config,
+    cash: state.cash
+  }));
+
+  // Recalcular totales cuando cambie el IVA
+  useEffect(() => {
+    if (items.length > 0) {
+      recalculateTotals(config.vatRate);
+    }
+  }, [config.vatRate, items.length, recalculateTotals]);
 
   const handleQuantityChange = (index: number, newQuantity: number) => {
     if (newQuantity < 1) {
@@ -50,13 +69,35 @@ const PedidoActual: React.FC = () => {
       <div className="mb-3">
         <div className="row g-2">
           <div className="col-6">
-            <small className="text-muted">Mesa:</small>
-            <div className="fw-bold">{mesa || 'S/N'}</div>
+            <label className="form-label form-label-sm">Mesa <small className="text-muted">(opcional)</small></label>
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Número de mesa (opcional)"
+              value={mesa}
+              onChange={(e) => setMesa(e.target.value)}
+            />
           </div>
           <div className="col-6">
-            <small className="text-muted">Cliente:</small>
-            <div className="fw-bold">{cliente || 'General'}</div>
+            <label className="form-label form-label-sm">Cliente</label>
+            <input
+              type="text"
+              className="form-control form-control-sm"
+              placeholder="Nombre del cliente"
+              value={cliente}
+              onChange={(e) => setCliente(e.target.value)}
+            />
           </div>
+        </div>
+        <div className="mt-2">
+          <label className="form-label form-label-sm">Observaciones</label>
+          <textarea
+            className="form-control form-control-sm"
+            placeholder="Observaciones del pedido..."
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
+            rows={2}
+          />
         </div>
       </div>
 
@@ -125,7 +166,7 @@ const PedidoActual: React.FC = () => {
           <span>${subtotal.toLocaleString()}</span>
         </div>
         <div className="total-line">
-          <span>IVA (19%):</span>
+          <span>IVA ({Math.round(config.vatRate * 100)}%):</span>
           <span>${iva.toLocaleString()}</span>
         </div>
         <div className="total-line total-final">
@@ -134,7 +175,37 @@ const PedidoActual: React.FC = () => {
         </div>
       </div>
 
-
+      {/* Botones de acción */}
+      {items.length > 0 && (
+        <div className="mt-3">
+          {cash?.estado !== 'abierta' && (
+            <div className="alert alert-warning mb-3 py-2">
+              <i className="bi bi-exclamation-triangle me-2"></i>
+              <small>Debe abrir la caja para procesar pedidos y pagos</small>
+            </div>
+          )}
+          <div className="d-grid gap-2">
+            <button
+              className="btn btn-outline-primary"
+              onClick={onImprimirComanda}
+              disabled={cash?.estado !== 'abierta'}
+              title={cash?.estado !== 'abierta' ? 'Debe abrir la caja para imprimir comandas' : ''}
+            >
+              <i className="bi bi-printer me-2"></i>
+              Imprimir Comanda
+            </button>
+            <button
+              className="btn btn-success"
+              onClick={onPagar}
+              disabled={cash?.estado !== 'abierta'}
+              title={cash?.estado !== 'abierta' ? 'Debe abrir la caja para procesar pagos' : ''}
+            >
+              <i className="bi bi-credit-card me-2"></i>
+              Procesar Pago
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

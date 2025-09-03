@@ -31,13 +31,21 @@ contextBridge.exposeInMainWorld('api', {
     create: (orden) => ipcRenderer.invoke('orden:create', orden),
     list: (filtros) => ipcRenderer.invoke('orden:list', filtros),
     changeStatus: (id, estado) => ipcRenderer.invoke('orden:changeStatus', id, estado),
-    get: (id) => ipcRenderer.invoke('orden:get', id)
+    get: (id) => ipcRenderer.invoke('orden:get', id),
+    delete: (id, motivo) => ipcRenderer.invoke('orden:delete', id, motivo)
   },
 
   // Pagos
   pagos: {
     add: (pago) => ipcRenderer.invoke('pago:add', pago),
     list: (ordenId) => ipcRenderer.invoke('pago:list', ordenId)
+  },
+
+  // Reportes
+  reportes: {
+    getVentasPorFecha: (fechaInicio, fechaFin) => ipcRenderer.invoke('reportes:getVentasPorFecha', fechaInicio, fechaFin),
+    getVentasPorCategoria: (fechaInicio, fechaFin) => ipcRenderer.invoke('reportes:getVentasPorCategoria', fechaInicio, fechaFin),
+    getProductosMasVendidos: (fechaInicio, fechaFin, limit) => ipcRenderer.invoke('reportes:getProductosMasVendidos', fechaInicio, fechaFin, limit)
   },
 
   // Impresora

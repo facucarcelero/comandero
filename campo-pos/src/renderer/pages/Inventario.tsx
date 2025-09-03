@@ -17,6 +17,7 @@ const Inventario: React.FC = () => {
     busqueda: '',
     soloActivos: true
   });
+  const [mostrandoCategorias, setMostrandoCategorias] = useState<boolean>(true);
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -49,6 +50,56 @@ const Inventario: React.FC = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCategoriaClick = (categoria: string) => {
+    setFiltros(prev => ({ ...prev, categoria }));
+    setMostrandoCategorias(false);
+  };
+
+  const handleVolverCategorias = () => {
+    setMostrandoCategorias(true);
+    setFiltros(prev => ({ ...prev, categoria: '', busqueda: '' }));
+  };
+
+  const handleNuevaCategoria = async () => {
+    const { value: nombreCategoria } = await Swal.fire({
+      title: 'Nueva Categoría',
+      text: 'Ingrese el nombre de la nueva categoría:',
+      input: 'text',
+      inputLabel: 'Nombre de la categoría:',
+      inputPlaceholder: 'Ej: Bebidas, Comidas, etc.',
+      inputValidator: (value) => {
+        if (!value || value.trim().length < 2) {
+          return 'Debe ingresar un nombre de al menos 2 caracteres';
+        }
+        if (categorias.includes(value.trim())) {
+          return 'Esta categoría ya existe';
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Crear',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#28a745'
+    });
+
+    if (nombreCategoria) {
+      // Agregar la nueva categoría a la lista
+      const nuevaCategoria = nombreCategoria.trim();
+      setCategorias(prev => [...prev, nuevaCategoria]);
+      
+      // Si estamos en el modal de crear producto, seleccionar la nueva categoría
+      if (showModal) {
+        setFormData(prev => ({ ...prev, categoria: nuevaCategoria }));
+      }
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Categoría creada',
+        text: `La categoría "${nuevaCategoria}" ha sido agregada y está lista para usar.`,
+        confirmButtonText: 'Entendido'
+      });
     }
   };
 
@@ -289,6 +340,15 @@ const Inventario: React.FC = () => {
             <p className="text-muted mb-0">Gestión de productos</p>
           </div>
           <div>
+            {mostrandoCategorias && (
+              <button
+                className="btn btn-outline-success me-2"
+                onClick={handleNuevaCategoria}
+              >
+                <i className="bi bi-tag me-2"></i>
+                Nueva Categoría
+              </button>
+            )}
             <button
               className="btn btn-outline-primary me-2"
               onClick={handleImportProducts}
@@ -314,56 +374,97 @@ const Inventario: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="card mb-4">
-        <div className="card-body">
-          <div className="row g-3">
-            <div className="col-md-4">
-              <label className="form-label">Categoría</label>
-              <select
-                className="form-select"
-                value={filtros.categoria}
-                onChange={(e) => setFiltros({ ...filtros, categoria: e.target.value })}
-              >
-                <option value="">Todas las categorías</option>
-                {categorias.map(categoria => (
-                  <option key={categoria} value={categoria}>
-                    {categoria}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-4">
-              <label className="form-label">Buscar</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Nombre del producto..."
-                value={filtros.busqueda}
-                onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
-              />
-            </div>
-            <div className="col-md-4">
-              <label className="form-label">Estado</label>
-              <div className="form-check">
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  id="soloActivos"
-                  checked={filtros.soloActivos}
-                  onChange={(e) => setFiltros({ ...filtros, soloActivos: e.target.checked })}
-                />
-                <label className="form-check-label" htmlFor="soloActivos">
-                  Solo productos activos
-                </label>
-              </div>
+      {mostrandoCategorias ? (
+        // Vista de categorías
+        <div className="card">
+          <div className="card-header d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">
+              <i className="bi bi-tags me-2"></i>
+              Categorías de Productos
+            </h5>
+          </div>
+          <div className="card-body">
+            <div className="row g-3">
+              {categorias.map(categoria => {
+                const productosEnCategoria = productos.filter(p => p.categoria === categoria);
+                return (
+                  <div key={categoria} className="col-md-6 col-lg-4">
+                    <div
+                      className="card h-100 cursor-pointer"
+                      onClick={() => handleCategoriaClick(categoria)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className="card-body text-center">
+                        <i className="bi bi-tag text-success" style={{ fontSize: '2rem' }}></i>
+                        <h6 className="card-title mt-2">{categoria}</h6>
+                        <p className="card-text text-muted">
+                          {productosEnCategoria.length} productos
+                        </p>
+                        <span className="badge bg-success">
+                          {productosEnCategoria.length} items
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        // Vista de productos
+        <>
+          {/* Filtros */}
+          <div className="card mb-4">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">
+                <i className="bi bi-funnel me-2"></i>
+                Filtros - {filtros.categoria || 'Todas las categorías'}
+              </h5>
+              <button
+                className="btn btn-outline-secondary btn-sm"
+                onClick={handleVolverCategorias}
+              >
+                <i className="bi bi-arrow-left me-1"></i>
+                Volver a categorías
+              </button>
+            </div>
+            <div className="card-body">
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Buscar</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Nombre del producto..."
+                    value={filtros.busqueda}
+                    onChange={(e) => setFiltros({ ...filtros, busqueda: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Estado</label>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="soloActivos"
+                      checked={filtros.soloActivos}
+                      onChange={(e) => setFiltros({ ...filtros, soloActivos: e.target.checked })}
+                    />
+                    <label className="form-check-label" htmlFor="soloActivos">
+                      Solo productos activos
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Tabla de productos */}
-      <div className="card">
+      {!mostrandoCategorias && (
+        <div className="card">
         <div className="card-body">
           <div className="table-responsive">
             <table className="table table-hover">
@@ -441,6 +542,7 @@ const Inventario: React.FC = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* Modal de producto */}
       {showModal && (
@@ -471,13 +573,31 @@ const Inventario: React.FC = () => {
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Categoría</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={formData.categoria}
-                      onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
-                      placeholder="Categoría del producto"
-                    />
+                    <div className="input-group">
+                      <select
+                        className="form-select"
+                        value={formData.categoria}
+                        onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
+                      >
+                        <option value="">Seleccionar categoría</option>
+                        {categorias.map(categoria => (
+                          <option key={categoria} value={categoria}>
+                            {categoria}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-outline-success"
+                        type="button"
+                        onClick={handleNuevaCategoria}
+                        title="Crear nueva categoría"
+                      >
+                        <i className="bi bi-plus"></i>
+                      </button>
+                    </div>
+                    <small className="form-text text-muted">
+                      Selecciona una categoría existente o crea una nueva
+                    </small>
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Precio *</label>

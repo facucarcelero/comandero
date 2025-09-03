@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { api, Caja } from '../lib/api';
+import React, { useState, useCallback } from 'react';
+import { useAppStore } from '../store/useAppStore';
 import { formatCurrency, formatDate } from '../lib/format';
 import Swal from 'sweetalert2';
 
 const CajaPage: React.FC = () => {
-  const [cajaActual, setCajaActual] = useState<Caja | null>(null);
-  const [resumenDia, setResumenDia] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Usar el store centralizado
+  const { cash, openCash, closeCash } = useAppStore(state => ({
+    cash: state.cash,
+    openCash: state.openCash,
+    closeCash: state.closeCash
+  }));
+
   const [showAbrirModal, setShowAbrirModal] = useState(false);
   const [showCerrarModal, setShowCerrarModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -15,34 +19,7 @@ const CajaPage: React.FC = () => {
     monto_final: 0
   });
 
-  useEffect(() => {
-    loadCajaData();
-  }, []);
-
-  const loadCajaData = async () => {
-    try {
-      setIsLoading(true);
-      const [estadoCaja, resumen] = await Promise.all([
-        api.getEstadoCaja(),
-        api.getResumenCaja()
-      ]);
-      
-      setCajaActual(estadoCaja);
-      setResumenDia(resumen);
-    } catch (error) {
-      console.error('Error al cargar datos de caja:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudieron cargar los datos de caja',
-        confirmButtonText: 'Entendido'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAbrirCaja = async () => {
+  const handleAbrirCaja = useCallback(async () => {
     if (!formData.responsable.trim()) {
       Swal.fire({
         icon: 'warning',
@@ -64,9 +41,9 @@ const CajaPage: React.FC = () => {
     }
 
     try {
-      await api.abrirCaja({
-        monto_inicial: formData.monto_inicial,
-        responsable: formData.responsable
+      await openCash({
+        responsable: formData.responsable,
+        monto_inicial: formData.monto_inicial
       });
 
       Swal.fire({
@@ -78,7 +55,6 @@ const CajaPage: React.FC = () => {
 
       setShowAbrirModal(false);
       setFormData({ monto_inicial: 0, responsable: '', monto_final: 0 });
-      loadCajaData();
     } catch (error) {
       console.error('Error al abrir caja:', error);
       Swal.fire({
@@ -88,9 +64,9 @@ const CajaPage: React.FC = () => {
         confirmButtonText: 'Entendido'
       });
     }
-  };
+  }, [formData, openCash]);
 
-  const handleCerrarCaja = async () => {
+  const handleCerrarCaja = useCallback(async () => {
     if (formData.monto_final < 0) {
       Swal.fire({
         icon: 'warning',
@@ -102,43 +78,30 @@ const CajaPage: React.FC = () => {
     }
 
     const result = await Swal.fire({
-      title: 'Cerrar caja',
-      text: `¿Está seguro de cerrar la caja con un monto final de ${formatCurrency(formData.monto_final)}?`,
-      icon: 'question',
+      title: '¿Cerrar caja?',
+      text: 'Esta acción no se puede deshacer',
+      icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: 'Sí, cerrar',
+      confirmButtonText: 'Sí, cerrar caja',
       cancelButtonText: 'Cancelar',
       confirmButtonColor: '#dc3545'
     });
 
     if (result.isConfirmed) {
       try {
-        await api.cerrarCaja({
+        await closeCash({
           monto_final: formData.monto_final
         });
-
-        // Imprimir cierre de caja
-        const cajaData = {
-          ...cajaActual,
-          fecha_cierre: new Date().toISOString(),
-          monto_final: formData.monto_final,
-          total_ventas: resumenDia?.total_ventas || 0,
-          total_pagos: resumenDia?.total_pagos || 0,
-          total_ordenes: resumenDia?.total_ordenes || 0
-        };
-
-        await api.printCierreCaja(cajaData);
 
         Swal.fire({
           icon: 'success',
           title: 'Caja cerrada',
-          text: 'La caja se ha cerrado correctamente y se ha impreso el reporte',
+          text: 'La caja se ha cerrado correctamente',
           confirmButtonText: 'Entendido'
         });
 
         setShowCerrarModal(false);
         setFormData({ monto_inicial: 0, responsable: '', monto_final: 0 });
-        loadCajaData();
       } catch (error) {
         console.error('Error al cerrar caja:', error);
         Swal.fire({
@@ -149,41 +112,22 @@ const CajaPage: React.FC = () => {
         });
       }
     }
-  };
-
-  const calcularDiferencia = () => {
-    if (!cajaActual || !resumenDia) return 0;
-    const montoEsperado = cajaActual.monto_inicial + (resumenDia.total_ventas || 0);
-    return (formData.monto_final || 0) - montoEsperado;
-  };
-
-  if (isLoading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </div>
-    );
-  }
+  }, [formData, closeCash]);
 
   return (
-    <div>
-      {/* Header */}
-      <div className="header">
-        <div className="d-flex justify-content-between align-items-center">
-          <div>
-            <h1>Gestión de Caja</h1>
-            <p className="text-muted mb-0">Control de apertura y cierre de caja</p>
-          </div>
-          <div>
-            <button
-              className="btn btn-primary"
-              onClick={loadCajaData}
-            >
-              <i className="bi bi-arrow-clockwise me-2"></i>
-              Actualizar
-            </button>
+    <div className="container-fluid">
+      <div className="row">
+        <div className="col-12">
+          <div className="card">
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <div>
+                <h4 className="mb-0">
+                  <i className="bi bi-cash-stack me-2"></i>
+                  Gestión de Caja
+                </h4>
+                <p className="text-muted mb-0">Control de apertura y cierre de caja</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -199,67 +143,60 @@ const CajaPage: React.FC = () => {
               </h5>
             </div>
             <div className="card-body">
-              {cajaActual ? (
+              {cash?.estado === 'abierta' ? (
                 <div>
-                  <div className={`alert ${cajaActual.estado === 'abierta' ? 'alert-success' : 'alert-danger'} mb-3`}>
-                    <i className={`bi ${cajaActual.estado === 'abierta' ? 'bi-unlock' : 'bi-lock'} me-2`}></i>
-                    <strong>
-                      {cajaActual.estado === 'abierta' ? 'Caja Abierta' : 'Caja Cerrada'}
-                    </strong>
+                  <div className="alert alert-success mb-3">
+                    <i className="bi bi-unlock me-2"></i>
+                    <strong>Caja Abierta</strong>
                   </div>
-
-                  <div className="row g-3">
+                  
+                  <div className="row">
                     <div className="col-6">
-                      <div className="text-center p-3 bg-light rounded">
-                        <div className="text-muted small">Responsable</div>
-                        <div className="fw-bold">{cajaActual.responsable}</div>
-                      </div>
+                      <p><strong>Responsable:</strong></p>
+                      <p>{cash.responsable}</p>
                     </div>
                     <div className="col-6">
-                      <div className="text-center p-3 bg-light rounded">
-                        <div className="text-muted small">Monto Inicial</div>
-                        <div className="fw-bold text-success">
-                          {formatCurrency(cajaActual.monto_inicial)}
-                        </div>
-                      </div>
+                      <p><strong>Monto Inicial:</strong></p>
+                      <p className="text-success fw-bold">
+                        {formatCurrency(cash.monto_inicial)}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="row">
+                    <div className="col-6">
+                      <p><strong>Fecha Apertura:</strong></p>
+                      <p>{formatDate(cash.fecha_apertura)}</p>
                     </div>
                     <div className="col-6">
-                      <div className="text-center p-3 bg-light rounded">
-                        <div className="text-muted small">Fecha Apertura</div>
-                        <div className="fw-bold">
-                          {formatDate(cajaActual.fecha_apertura)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="col-6">
-                      <div className="text-center p-3 bg-light rounded">
-                        <div className="text-muted small">Hora Apertura</div>
-                        <div className="fw-bold">
-                          {new Date(cajaActual.fecha_apertura).toLocaleTimeString()}
-                        </div>
-                      </div>
+                      <p><strong>Hora Apertura:</strong></p>
+                      <p>{new Date(cash.fecha_apertura).toLocaleTimeString()}</p>
                     </div>
                   </div>
 
-                  {cajaActual.estado === 'abierta' && (
-                    <div className="mt-3">
-                      <button
-                        className="btn btn-danger w-100"
-                        onClick={() => setShowCerrarModal(true)}
-                      >
-                        <i className="bi bi-lock me-2"></i>
-                        Cerrar Caja
-                      </button>
-                    </div>
-                  )}
+                  <div className="mt-3">
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => setShowCerrarModal(true)}
+                    >
+                      <i className="bi bi-lock me-2"></i>
+                      Cerrar Caja
+                    </button>
+                  </div>
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <i className="bi bi-cash-stack display-4 text-muted mb-3"></i>
-                  <h5>No hay caja abierta</h5>
-                  <p className="text-muted">Abra la caja para comenzar a operar</p>
+                <div>
+                  <div className="alert alert-danger mb-3">
+                    <i className="bi bi-lock me-2"></i>
+                    <strong>Caja Cerrada</strong>
+                  </div>
+                  
+                  <p className="text-muted">
+                    La caja está cerrada. Para realizar operaciones, debe abrirla primero.
+                  </p>
+                  
                   <button
-                    className="btn btn-success"
+                    className="btn btn-primary"
                     onClick={() => setShowAbrirModal(true)}
                   >
                     <i className="bi bi-unlock me-2"></i>
@@ -281,50 +218,28 @@ const CajaPage: React.FC = () => {
               </h5>
             </div>
             <div className="card-body">
-              {resumenDia ? (
-                <div className="row g-3">
-                  <div className="col-6">
-                    <div className="text-center p-3 bg-light rounded">
-                      <div className="text-muted small">Total Ventas</div>
-                      <div className="fw-bold text-success">
-                        {formatCurrency(resumenDia.total_ventas || 0)}
-                      </div>
+              {cash?.estado === 'abierta' ? (
+                <div>
+                  <div className="row">
+                    <div className="col-6">
+                      <p><strong>Monto Inicial:</strong></p>
+                      <p className="text-success fw-bold fs-4">
+                        {formatCurrency(cash.monto_inicial)}
+                      </p>
                     </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="text-center p-3 bg-light rounded">
-                      <div className="text-muted small">Total Órdenes</div>
-                      <div className="fw-bold text-primary">
-                        {resumenDia.total_ordenes || 0}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="text-center p-3 bg-light rounded">
-                      <div className="text-muted small">Total Pagos</div>
-                      <div className="fw-bold text-info">
-                        {formatCurrency(resumenDia.total_pagos || 0)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-6">
-                    <div className="text-center p-3 bg-light rounded">
-                      <div className="text-muted small">Promedio por Orden</div>
-                      <div className="fw-bold text-warning">
-                        {formatCurrency(
-                          resumenDia.total_ordenes > 0 
-                            ? (resumenDia.total_ventas || 0) / resumenDia.total_ordenes 
-                            : 0
-                        )}
-                      </div>
+                    <div className="col-6">
+                      <p><strong>Estado:</strong></p>
+                      <p className="text-primary fw-bold fs-4">
+                        {cash.estado === 'abierta' ? 'Abierta' : 'Cerrada'}
+                      </p>
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="text-center text-muted py-4">
-                  <i className="bi bi-graph-up display-4 mb-3"></i>
-                  <h5>Sin datos del día</h5>
-                  <p>No hay información de ventas para hoy</p>
+                  <i className="bi bi-graph-down display-4 mb-3"></i>
+                  <h5>Sin datos</h5>
+                  <p>Abra la caja para ver el resumen del día</p>
                 </div>
               )}
             </div>
@@ -332,7 +247,7 @@ const CajaPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Modal abrir caja */}
+      {/* Modal para abrir caja */}
       {showAbrirModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">
@@ -347,12 +262,12 @@ const CajaPage: React.FC = () => {
               </div>
               <div className="modal-body">
                 <div className="mb-3">
-                  <label className="form-label">Responsable *</label>
+                  <label className="form-label">Responsable</label>
                   <input
                     type="text"
                     className="form-control"
                     value={formData.responsable}
-                    onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
+                    onChange={(e) => setFormData({...formData, responsable: e.target.value})}
                     placeholder="Nombre del responsable"
                   />
                 </div>
@@ -362,7 +277,7 @@ const CajaPage: React.FC = () => {
                     type="number"
                     className="form-control"
                     value={formData.monto_inicial}
-                    onChange={(e) => setFormData({ ...formData, monto_inicial: Number(e.target.value) })}
+                    onChange={(e) => setFormData({...formData, monto_inicial: parseFloat(e.target.value) || 0})}
                     placeholder="0"
                     min="0"
                     step="0.01"
@@ -379,7 +294,7 @@ const CajaPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-success"
+                  className="btn btn-primary"
                   onClick={handleAbrirCaja}
                 >
                   Abrir Caja
@@ -390,7 +305,7 @@ const CajaPage: React.FC = () => {
         </div>
       )}
 
-      {/* Modal cerrar caja */}
+      {/* Modal para cerrar caja */}
       {showCerrarModal && (
         <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
           <div className="modal-dialog">
@@ -404,52 +319,27 @@ const CajaPage: React.FC = () => {
                 ></button>
               </div>
               <div className="modal-body">
-                {cajaActual && resumenDia && (
-                  <div className="mb-3">
-                    <div className="row g-2">
-                      <div className="col-6">
-                        <div className="text-center p-2 bg-light rounded">
-                          <div className="text-muted small">Monto Inicial</div>
-                          <div className="fw-bold">{formatCurrency(cajaActual.monto_inicial)}</div>
-                        </div>
-                      </div>
-                      <div className="col-6">
-                        <div className="text-center p-2 bg-light rounded">
-                          <div className="text-muted small">Total Ventas</div>
-                          <div className="fw-bold">{formatCurrency(resumenDia.total_ventas || 0)}</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-center mt-2">
-                      <div className="text-muted small">Monto Esperado</div>
-                      <div className="fw-bold text-primary">
-                        {formatCurrency(cajaActual.monto_inicial + (resumenDia.total_ventas || 0))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 <div className="mb-3">
-                  <label className="form-label">Monto Final *</label>
+                  <label className="form-label">Monto Final</label>
                   <input
                     type="number"
                     className="form-control"
                     value={formData.monto_final}
-                    onChange={(e) => setFormData({ ...formData, monto_final: Number(e.target.value) })}
+                    onChange={(e) => setFormData({...formData, monto_final: parseFloat(e.target.value) || 0})}
                     placeholder="0"
                     min="0"
                     step="0.01"
                   />
                 </div>
-
-                {cajaActual && resumenDia && (
+                
+                {cash && (
                   <div className="alert alert-info">
-                    <div className="d-flex justify-content-between">
-                      <span>Diferencia:</span>
-                      <span className={`fw-bold ${calcularDiferencia() >= 0 ? 'text-success' : 'text-danger'}`}>
-                        {calcularDiferencia() >= 0 ? '+' : ''}{formatCurrency(calcularDiferencia())}
+                    <p><strong>Monto Inicial:</strong> {formatCurrency(cash.monto_inicial)}</p>
+                    <p><strong>Diferencia:</strong> 
+                      <span className={formData.monto_final >= cash.monto_inicial ? 'text-success' : 'text-danger'}>
+                        {formatCurrency(formData.monto_final - cash.monto_inicial)}
                       </span>
-                    </div>
+                    </p>
                   </div>
                 )}
               </div>

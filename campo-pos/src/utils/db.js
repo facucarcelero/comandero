@@ -1,7 +1,26 @@
-const low = require('lowdb');
-const FileSync = require('lowdb/adapters/FileSync');
 const path = require('path');
 const fs = require('fs');
+
+// Resolver ruta de dependencias para aplicación empaquetada
+function resolveNodeModule(moduleName) {
+  const possiblePaths = [
+    path.join(__dirname, '../../node_modules', moduleName),
+    path.join(__dirname, '../../../resources/node_modules', moduleName),
+    path.join(process.resourcesPath, 'node_modules', moduleName)
+  ];
+
+  for (const modulePath of possiblePaths) {
+    if (fs.existsSync(modulePath)) {
+      return modulePath;
+    }
+  }
+
+  // Fallback a require normal
+  return moduleName;
+}
+
+const low = require(resolveNodeModule('lowdb'));
+const FileSync = require(resolveNodeModule('lowdb/adapters/FileSync'));
 
 let db;
 
@@ -164,7 +183,10 @@ function abrirCaja(data) {
     fecha_apertura: new Date().toISOString(),
     monto_inicial: data.monto_inicial,
     responsable: data.responsable,
-    estado: 'abierta'
+    estado: 'abierta',
+    total_ventas: 0,
+    total_ordenes: 0,
+    total_pagos: 0
   };
 
   db.get('caja').push(newCaja).write();
@@ -272,6 +294,15 @@ function createOrden(orden) {
     }
   });
 
+  // Actualizar totales de caja
+  db.get('caja')
+    .find({ estado: 'abierta' })
+    .assign({
+      total_ventas: (cajaAbierta.total_ventas || 0) + orden.total,
+      total_ordenes: (cajaAbierta.total_ordenes || 0) + 1
+    })
+    .write();
+
   return { id: newOrdenId, ...orden };
 }
 
@@ -345,6 +376,77 @@ function updateEstadoOrden(id, estado) {
   return !!result;
 }
 
+function deleteOrden(id, motivo) {
+  try {
+    const orden = db.get('ordenes').find({ id: parseInt(id) }).value();
+    if (!orden) {
+      return false;
+    }
+
+    // Marcar como eliminada en lugar de borrar físicamente
+    const result = db.get('ordenes')
+      .find({ id: parseInt(id) })
+      .assign({ 
+        estado: 'eliminada',
+        motivo_eliminacion: motivo,
+        fecha_eliminacion: new Date().toISOString()
+      })
+      .write();
+
+    if (result) {
+      // Restaurar stock de los productos
+      const items = db.get('orden_items').filter({ orden_id: parseInt(id) }).value();
+      
+      for (const item of items) {
+        const producto = db.get('productos').find({ id: item.producto_id }).value();
+        if (producto) {
+          // Restaurar el stock
+          db.get('productos')
+            .find({ id: item.producto_id })
+            .assign({ stock: producto.stock + item.cantidad })
+            .write();
+        }
+      }
+
+      // Marcar items como eliminados también
+      db.get('orden_items')
+        .filter({ orden_id: parseInt(id) })
+        .assign({ estado: 'eliminado' })
+        .write();
+
+      // Marcar pagos como eliminados
+      db.get('pagos')
+        .filter({ orden_id: parseInt(id) })
+        .assign({ estado: 'eliminado' })
+        .write();
+
+      // Actualizar totales de caja si está abierta
+      const cajaAbierta = db.get('caja').find({ estado: 'abierta' }).value();
+      if (cajaAbierta) {
+        // Restar el total de la orden eliminada de los totales de caja
+        const totalOrden = orden.total || 0;
+        const pagosOrden = db.get('pagos').filter({ orden_id: parseInt(id) }).value();
+        const cantidadPagos = pagosOrden.length;
+        
+        // Actualizar totales de caja
+        db.get('caja')
+          .find({ estado: 'abierta' })
+          .assign({
+            total_ventas: Math.max(0, (cajaAbierta.total_ventas || 0) - totalOrden),
+            total_ordenes: Math.max(0, (cajaAbierta.total_ordenes || 0) - 1),
+            total_pagos: Math.max(0, (cajaAbierta.total_pagos || 0) - cantidadPagos)
+          })
+          .write();
+      }
+    }
+
+    return !!result;
+  } catch (error) {
+    console.error('Error al eliminar orden:', error);
+    return false;
+  }
+}
+
 // ===== PAGOS =====
 
 function addPago(pago) {
@@ -360,6 +462,18 @@ function addPago(pago) {
   };
 
   db.get('pagos').push(newPago).write();
+
+  // Actualizar total de pagos en caja si está abierta
+  const cajaAbierta = db.get('caja').find({ estado: 'abierta' }).value();
+  if (cajaAbierta) {
+    db.get('caja')
+      .find({ estado: 'abierta' })
+      .assign({
+        total_pagos: (cajaAbierta.total_pagos || 0) + 1
+      })
+      .write();
+  }
+
   return newPago;
 }
 
@@ -501,6 +615,7 @@ module.exports = {
   getOrdenes,
   getOrden,
   updateEstadoOrden,
+  deleteOrden,
   // Pagos
   addPago,
   getPagos,

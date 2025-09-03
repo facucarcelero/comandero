@@ -76,54 +76,53 @@ const Reportes: React.FC = () => {
     try {
       setIsLoading(true);
       
-      // Simular datos para el demo (en producción vendrían de la API)
-      const ventasPorFecha = [
-        { fecha: '2024-01-01', total_ventas: 150000, total_ordenes: 12 },
-        { fecha: '2024-01-02', total_ventas: 200000, total_ordenes: 15 },
-        { fecha: '2024-01-03', total_ventas: 180000, total_ordenes: 14 },
-        { fecha: '2024-01-04', total_ventas: 220000, total_ordenes: 18 },
-        { fecha: '2024-01-05', total_ventas: 190000, total_ordenes: 16 }
-      ];
+      // Obtener datos reales de la API
+      const [ventasPorFecha, ventasPorCategoria, productosMasVendidos] = await Promise.all([
+        api.getVentasPorFecha(filtros.fecha_inicio, filtros.fecha_fin),
+        api.getVentasPorCategoria(filtros.fecha_inicio, filtros.fecha_fin),
+        api.getProductosMasVendidos(filtros.fecha_inicio, filtros.fecha_fin, 10)
+      ]);
 
-      const ventasPorCategoria = [
-        { categoria: 'Hamburguesas', total_ventas: 450000, cantidad_vendida: 25 },
-        { categoria: 'Bebidas', total_ventas: 120000, cantidad_vendida: 40 },
-        { categoria: 'Acompañamientos', total_ventas: 80000, cantidad_vendida: 20 },
-        { categoria: 'Ensaladas', total_ventas: 60000, cantidad_vendida: 8 }
-      ];
+      // Obtener métodos de pago desde las órdenes reales
+      const ordenes = await api.getOrdenes({
+        fecha_desde: filtros.fecha_inicio,
+        fecha_hasta: filtros.fecha_fin,
+        estado: 'completado'
+      });
 
-      const productosMasVendidos = [
-        { nombre: 'Hamburguesa Clásica', categoria: 'Hamburguesas', cantidad_vendida: 15, total_ventas: 225000 },
-        { nombre: 'Coca Cola', categoria: 'Bebidas', cantidad_vendida: 25, total_ventas: 75000 },
-        { nombre: 'Papas Fritas', categoria: 'Acompañamientos', cantidad_vendida: 18, total_ventas: 90000 },
-        { nombre: 'Hamburguesa Especial', categoria: 'Hamburguesas', cantidad_vendida: 10, total_ventas: 180000 },
-        { nombre: 'Agua', categoria: 'Bebidas', cantidad_vendida: 15, total_ventas: 30000 }
-      ];
+      // Calcular métodos de pago
+      const metodosPagoMap = new Map();
+      for (const orden of ordenes) {
+        const pagos = await api.getPagos(orden.id);
+        for (const pago of pagos) {
+          const current = metodosPagoMap.get(pago.metodo) || 0;
+          metodosPagoMap.set(pago.metodo, current + pago.monto);
+        }
+      }
 
-      const metodosPago = [
-        { metodo: 'efectivo', total: 400000 },
-        { metodo: 'tarjeta', total: 300000 },
-        { metodo: 'transferencia', total: 100000 }
-      ];
+      const metodosPago = Array.from(metodosPagoMap.entries()).map(([metodo, total]) => ({
+        metodo,
+        total
+      }));
 
       setDatos({
-        ventasPorFecha,
-        ventasPorCategoria,
-        productosMasVendidos,
+        ventasPorFecha: ventasPorFecha || [],
+        ventasPorCategoria: ventasPorCategoria || [],
+        productosMasVendidos: productosMasVendidos || [],
         metodosPago
       });
 
-      // Calcular resumen
-      const totalVentas = ventasPorFecha.reduce((sum, item) => sum + item.total_ventas, 0);
-      const totalOrdenes = ventasPorFecha.reduce((sum, item) => sum + item.total_ordenes, 0);
+      // Calcular resumen con datos reales
+      const totalVentas = ventasPorFecha?.reduce((sum, item) => sum + item.total_ventas, 0) || 0;
+      const totalOrdenes = ventasPorFecha?.reduce((sum, item) => sum + item.total_ordenes, 0) || 0;
       const promedioOrden = totalOrdenes > 0 ? totalVentas / totalOrdenes : 0;
 
       setResumen({
         total_ventas: totalVentas,
         total_ordenes: totalOrdenes,
         promedio_orden: promedioOrden,
-        total_categorias: ventasPorCategoria.length,
-        total_productos: productosMasVendidos.length
+        total_categorias: ventasPorCategoria?.length || 0,
+        total_productos: productosMasVendidos?.length || 0
       });
 
     } catch (error) {

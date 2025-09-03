@@ -44,12 +44,13 @@ interface PedidoState {
   getItemCount: () => number;
   getItemByProductId: (productoId: number) => OrdenItem | undefined;
   hasItems: () => boolean;
+  recalculateTotals: (ivaPercentage: number) => void;
 }
 
 // Función para calcular totales
-const calculateTotals = (items: OrdenItem[], ivaPercentage: number = 19) => {
+const calculateTotals = (items: OrdenItem[], ivaPercentage: number = 0.19) => {
   const subtotal = items.reduce((total, item) => total + item.subtotal, 0);
-  const iva = Math.round(subtotal * (ivaPercentage / 100));
+  const iva = Math.round(subtotal * ivaPercentage);
   const total = subtotal + iva;
   
   return { subtotal, iva, total };
@@ -179,6 +180,17 @@ export const usePedidoStore = create<PedidoState>()(
       hasItems: () => {
         const { items } = get();
         return items.length > 0;
+      },
+
+      // Recalcular totales con nuevo IVA
+      recalculateTotals: (ivaPercentage: number) => {
+        const { items } = get();
+        const totals = calculateTotals(items, ivaPercentage);
+        set({ 
+          subtotal: totals.subtotal, 
+          iva: totals.iva, 
+          total: totals.total 
+        });
       }
     }),
     {
@@ -263,7 +275,8 @@ export const usePedidoActions = () => {
     setObservaciones: store.setObservaciones,
     clearPedido: store.clearPedido,
     setLoading: store.setLoading,
-    setError: store.setError
+    setError: store.setError,
+    recalculateTotals: store.recalculateTotals
   };
 };
 
@@ -307,16 +320,14 @@ export const useValidatePedido = () => {
   const store = usePedidoStore();
   
   return () => {
-    const { items, mesa, cliente } = store;
+    const { items, cliente } = store;
     const errors: string[] = [];
     
     if (items.length === 0) {
       errors.push('El pedido debe tener al menos un item');
     }
     
-    if (!mesa.trim()) {
-      errors.push('Debe especificar una mesa');
-    }
+    // Mesa es opcional, no validar
     
     if (!cliente.trim()) {
       errors.push('Debe especificar un cliente');

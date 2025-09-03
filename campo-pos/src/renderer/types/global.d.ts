@@ -24,7 +24,7 @@ export interface OrdenItem {
 export interface Orden {
   id?: number;
   fecha?: string;
-  estado: 'pendiente' | 'completado' | 'cancelado';
+  estado: 'pendiente' | 'completado' | 'cancelado' | 'eliminada';
   mesa?: string;
   cliente?: string;
   subtotal: number;
@@ -34,6 +34,8 @@ export interface Orden {
   observaciones?: string;
   items: OrdenItem[];
   pagos?: Pago[];
+  motivo_eliminacion?: string;
+  fecha_eliminacion?: string;
 }
 
 export interface Pago {

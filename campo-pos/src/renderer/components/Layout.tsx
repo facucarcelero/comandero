@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { usePedidoSelectors } from '../store/usePedidoStore';
-import { api } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
+import { startSyncService } from '../lib/syncService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -9,37 +9,16 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
-  const { itemCount, total } = usePedidoSelectors();
-  const [cajaAbierta, setCajaAbierta] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Usar el store centralizado
+  const cashStatus = useAppStore(state => state.cash?.estado || 'cerrada');
+  const isLoading = useAppStore(state => state.isLoading);
+  const config = useAppStore(state => state.config);
 
+  // Iniciar servicio de sincronización una sola vez
   useEffect(() => {
-    checkCajaStatus();
+    startSyncService();
   }, []);
-
-  const checkCajaStatus = async () => {
-    try {
-      console.log('Verificando estado de caja...');
-      console.log('API disponible:', !!window.api);
-      console.log('window.api:', window.api);
-      
-      if (!window.api) {
-        console.error('❌ window.api no está disponible');
-        setError('API no disponible');
-        return;
-      }
-      
-      const estado = await api.getEstadoCaja();
-      console.log('Estado de caja:', estado);
-      setCajaAbierta(!!estado);
-    } catch (error) {
-      console.error('Error al verificar estado de caja:', error);
-      setError('Error al conectar con la base de datos');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const menuItems = [
     {
@@ -106,23 +85,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
         {/* Estado de caja */}
         <div className="px-3 mb-3">
-          <div className={`alert ${cajaAbierta ? 'alert-success' : 'alert-danger'} mb-0 py-2`}>
-            <i className={`bi ${cajaAbierta ? 'bi-unlock' : 'bi-lock'} me-2`}></i>
+          <div className={`alert ${cashStatus === 'abierta' ? 'alert-success' : 'alert-danger'} mb-0 py-2`}>
+            <i className={`bi ${cashStatus === 'abierta' ? 'bi-unlock' : 'bi-lock'} me-2`}></i>
             <small>
-              {cajaAbierta ? 'Caja Abierta' : 'Caja Cerrada'}
+              {cashStatus === 'abierta' ? 'Caja Abierta' : 'Caja Cerrada'}
             </small>
           </div>
         </div>
 
-        {/* Error de conexión */}
-        {error && (
-          <div className="px-3 mb-3">
-            <div className="alert alert-warning mb-0 py-2">
-              <i className="bi bi-exclamation-triangle me-2"></i>
-              <small>{error}</small>
-            </div>
+        {/* Información de configuración */}
+        <div className="px-3 mb-3">
+          <div className="alert alert-info mb-0 py-2">
+            <i className="bi bi-percent me-2"></i>
+            <small>IVA: {Math.round(config.vatRate * 100)}%</small>
           </div>
-        )}
+        </div>
 
         {/* Navegación */}
         <div className="nav-menu">
@@ -152,12 +129,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 </h6>
                 <div className="d-flex justify-content-between text-white">
                   <span>Items:</span>
-                  <span className="fw-bold">{itemCount}</span>
+                  <span className="fw-bold">0</span>
                 </div>
                 <div className="d-flex justify-content-between text-white">
                   <span>Total:</span>
                   <span className="fw-bold text-success">
-                    ${total.toLocaleString()}
+                    $0
                   </span>
                 </div>
               </div>

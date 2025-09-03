@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Inicio from './pages/Inicio';
 import Inventario from './pages/Inventario';
@@ -7,12 +7,11 @@ import Caja from './pages/Caja';
 import Reportes from './pages/Reportes';
 import Config from './pages/Config';
 
-
 function App() {
   console.log('🚀 App component rendering...');
   
   return (
-    <Router>
+    <HashRouter>
       <Layout>
         <Routes>
           <Route path="/" element={<Inicio />} />
@@ -21,10 +20,9 @@ function App() {
           <Route path="/caja" element={<Caja />} />
           <Route path="/reportes" element={<Reportes />} />
           <Route path="/config" element={<Config />} />
-
         </Routes>
       </Layout>
-    </Router>
+    </HashRouter>
   );
 }
 

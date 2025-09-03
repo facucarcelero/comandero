@@ -87,7 +87,13 @@ jspm_packages/
 
 # Electron
 out/
+release/
+renderer/
 
 # Backup files
 backups/
 *.backup
+
+# Installers
+*.zip
+*.exe

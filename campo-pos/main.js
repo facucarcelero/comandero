@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const isDev = process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL;
 
 // Importar módulos de utilidades
@@ -36,14 +37,31 @@ function createWindow() {
     const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
     console.log('🔗 Cargando desde:', devUrl);
     mainWindow.loadURL(devUrl);
-    mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'build/renderer/index.html'));
+    const indexPath = path.join(__dirname, 'renderer/index.html');
+    console.log('🔗 Cargando archivo:', indexPath);
+    console.log('🔗 Archivo existe:', fs.existsSync(indexPath));
+    console.log('🔗 __dirname:', __dirname);
+
+    // Opción B: loadURL con file:// (robusto)
+    const { pathToFileURL } = require('url');
+    const fileUrl = pathToFileURL(indexPath).toString();
+    console.log('🔗 File URL:', fileUrl);
+    
+    mainWindow.loadURL(fileUrl).then(() => {
+      console.log('✅ Archivo HTML cargado correctamente');
+    }).catch((error) => {
+      console.error('❌ Error al cargar archivo HTML:', error);
+    });
   }
 
   mainWindow.once('ready-to-show', () => {
     console.log('✅ Ventana lista para mostrar');
     mainWindow.show();
+    // Solo abrir DevTools en modo desarrollo
+    if (isDev) {
+      mainWindow.webContents.openDevTools();
+    }
   });
 
   mainWindow.on('closed', () => {
@@ -67,8 +85,25 @@ function createWindow() {
 
 // Inicializar la aplicación
 app.whenReady().then(async () => {
+  console.log('🚀 Aplicación lista');
+  
   // Inicializar base de datos
-  await db.init();
+  console.log('🔧 Inicializando base de datos...');
+  try {
+    await db.init();
+    console.log('✅ Base de datos inicializada correctamente');
+  } catch (error) {
+    console.error('❌ Error al inicializar base de datos:', error);
+  }
+  
+  // Inicializar configuraciones
+  console.log('🔧 Inicializando configuraciones...');
+  try {
+    await settings.initSettings();
+    console.log('✅ Configuraciones inicializadas correctamente');
+  } catch (error) {
+    console.error('❌ Error al inicializar configuraciones:', error);
+  }
   
   createWindow();
 
@@ -155,12 +190,29 @@ ipcMain.handle('orden:get', async (event, id) => {
   return db.getOrden(id);
 });
 
+ipcMain.handle('orden:delete', async (event, id, motivo) => {
+  return db.deleteOrden(id, motivo);
+});
+
 ipcMain.handle('pago:add', async (event, pago) => {
   return db.addPago(pago);
 });
 
 ipcMain.handle('pago:list', async (event, ordenId) => {
   return db.getPagos(ordenId);
+});
+
+// Reportes
+ipcMain.handle('reportes:getVentasPorFecha', async (event, fechaInicio, fechaFin) => {
+  return db.getVentasPorFecha(fechaInicio, fechaFin);
+});
+
+ipcMain.handle('reportes:getVentasPorCategoria', async (event, fechaInicio, fechaFin) => {
+  return db.getVentasPorCategoria(fechaInicio, fechaFin);
+});
+
+ipcMain.handle('reportes:getProductosMasVendidos', async (event, fechaInicio, fechaFin, limit) => {
+  return db.getProductosMasVendidos(fechaInicio, fechaFin, limit);
 });
 
 // Impresora

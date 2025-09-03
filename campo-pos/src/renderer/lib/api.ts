@@ -82,6 +82,10 @@ class ApiWrapper {
     return this.handleRequest(() => window.api.ordenes.get(id));
   }
 
+  async deleteOrden(id: number, motivo: string): Promise<boolean> {
+    return this.handleRequest(() => window.api.ordenes.delete(id, motivo));
+  }
+
   // Pagos
   async addPago(pago: Omit<Pago, 'id'>): Promise<Pago> {
     return this.handleRequest(() => window.api.pagos.add(pago));
@@ -89,6 +93,19 @@ class ApiWrapper {
 
   async getPagos(ordenId: number): Promise<Pago[]> {
     return this.handleRequest(() => window.api.pagos.list(ordenId));
+  }
+
+  // Reportes
+  async getVentasPorFecha(fechaInicio: string, fechaFin: string): Promise<any[]> {
+    return this.handleRequest(() => window.api.reportes.getVentasPorFecha(fechaInicio, fechaFin));
+  }
+
+  async getVentasPorCategoria(fechaInicio: string, fechaFin: string): Promise<any[]> {
+    return this.handleRequest(() => window.api.reportes.getVentasPorCategoria(fechaInicio, fechaFin));
+  }
+
+  async getProductosMasVendidos(fechaInicio: string, fechaFin: string, limit: number = 10): Promise<any[]> {
+    return this.handleRequest(() => window.api.reportes.getProductosMasVendidos(fechaInicio, fechaFin, limit));
   }
 
   // Impresora

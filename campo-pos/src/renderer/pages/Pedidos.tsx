@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api, Orden } from '../lib/api';
+import { api } from '../lib/api';
+import { Orden } from '../types/global';
 import { formatCurrency, formatDate, formatStatus } from '../lib/format';
 import Swal from 'sweetalert2';
 
@@ -89,6 +90,66 @@ const Pedidos: React.FC = () => {
     }
   };
 
+  const handleEliminarPedido = async (orden: Orden) => {
+    // Verificar que la orden no esté ya eliminada
+    if (orden.estado === 'eliminada') {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Orden ya eliminada',
+        text: 'Esta orden ya ha sido eliminada anteriormente',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
+    // Modal para solicitar motivo de eliminación
+    const { value: motivo } = await Swal.fire({
+      title: 'Eliminar Pedido',
+      text: `¿Está seguro de eliminar el pedido #${orden.id}?`,
+      input: 'textarea',
+      inputLabel: 'Motivo de eliminación:',
+      inputPlaceholder: 'Ingrese el motivo por el cual elimina este pedido...',
+      inputValidator: (value) => {
+        if (!value || value.trim().length < 1) {
+          return 'Debe ingresar un motivo de al menos 1 carácter';
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: 'Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc3545',
+      icon: 'warning'
+    });
+
+    if (motivo) {
+      try {
+        const success = await api.deleteOrden(orden.id!, motivo);
+        
+        if (success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Pedido eliminado',
+            text: 'El pedido ha sido eliminado y el stock ha sido restaurado',
+            confirmButtonText: 'Entendido'
+          });
+          
+          // Recargar la lista de pedidos
+          await loadOrdenes();
+        } else {
+          throw new Error('No se pudo eliminar el pedido');
+        }
+      } catch (error) {
+        console.error('Error al eliminar pedido:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: 'No se pudo eliminar el pedido',
+          confirmButtonText: 'Entendido'
+        });
+      }
+    }
+  };
+
   const handleReimprimirTicket = async (orden: Orden) => {
     try {
       const ordenCompleta = await api.getOrden(orden.id!);
@@ -149,6 +210,8 @@ const Pedidos: React.FC = () => {
         return 'bg-success';
       case 'cancelado':
         return 'bg-danger';
+      case 'eliminada':
+        return 'bg-secondary';
       default:
         return 'bg-secondary';
     }
@@ -231,11 +294,11 @@ const Pedidos: React.FC = () => {
               />
             </div>
             <div className="col-md-3">
-              <label className="form-label">Mesa</label>
+              <label className="form-label">Mesa <small className="text-muted">(opcional)</small></label>
               <input
                 type="text"
                 className="form-control"
-                placeholder="Número de mesa"
+                placeholder="Número de mesa (opcional)"
                 value={filtros.mesa}
                 onChange={(e) => setFiltros({ ...filtros, mesa: e.target.value })}
               />
@@ -288,7 +351,7 @@ const Pedidos: React.FC = () => {
               </thead>
               <tbody>
                 {ordenes.map(orden => (
-                  <tr key={orden.id}>
+                  <tr key={orden.id} className={orden.estado === 'eliminada' ? 'table-secondary' : ''}>
                     <td>
                       <span className="fw-bold">#{orden.id}</span>
                     </td>
@@ -357,6 +420,15 @@ const Pedidos: React.FC = () => {
                         >
                           <i className="bi bi-receipt"></i>
                         </button>
+                        {orden.estado !== 'eliminada' && (
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => handleEliminarPedido(orden)}
+                            title="Eliminar pedido"
+                          >
+                            <i className="bi bi-trash"></i>
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -418,6 +490,14 @@ const Pedidos: React.FC = () => {
                   </div>
                 )}
 
+                {ordenSeleccionada.estado === 'eliminada' && (
+                  <div className="alert alert-warning mb-3">
+                    <h6><i className="bi bi-exclamation-triangle me-2"></i>Pedido Eliminado</h6>
+                    <p className="mb-1"><strong>Motivo:</strong> {ordenSeleccionada.motivo_eliminacion}</p>
+                    <p className="mb-0"><strong>Fecha de eliminación:</strong> {formatDate(ordenSeleccionada.fecha_eliminacion!)}</p>
+                  </div>
+                )}
+
                 <h6>Items del pedido:</h6>
                 <div className="table-responsive">
                   <table className="table table-sm">
@@ -430,7 +510,7 @@ const Pedidos: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {ordenSeleccionada.items?.map((item, index) => (
+                      {ordenSeleccionada.items?.map((item: any, index: number) => (
                         <tr key={index}>
                           <td>
                             <div>{item.nombre}</div>
@@ -479,7 +559,7 @@ const Pedidos: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {ordenSeleccionada.pagos.map((pago, index) => (
+                          {ordenSeleccionada.pagos.map((pago: any, index: number) => (
                             <tr key={index}>
                               <td>{pago.metodo.toUpperCase()}</td>
                               <td>{formatCurrency(pago.monto)}</td>

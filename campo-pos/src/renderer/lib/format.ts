@@ -1,9 +1,19 @@
 // Utilidades de formateo para la aplicación
 
-export const formatCurrency = (amount: number, currency = 'COP'): string => {
-  return new Intl.NumberFormat('es-CO', {
+export const formatCurrency = (amount: number, currency = 'ARS'): string => {
+  // Mapear símbolos a códigos de moneda
+  const currencyMap: Record<string, string> = {
+    '$': 'ARS',
+    'ARS': 'ARS',
+    'USD': 'USD',
+    'COP': 'COP'
+  };
+  
+  const currencyCode = currencyMap[currency] || currency;
+  
+  return new Intl.NumberFormat('es-AR', {
     style: 'currency',
-    currency: currency,
+    currency: currencyCode,
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount);
@@ -134,6 +144,7 @@ export const formatStatus = (status: string): string => {
     pendiente: 'Pendiente',
     completado: 'Completado',
     cancelado: 'Cancelado',
+    eliminada: 'Eliminada',
     abierta: 'Abierta',
     cerrada: 'Cerrada'
   };

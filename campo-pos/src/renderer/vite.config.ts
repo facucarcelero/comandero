@@ -4,10 +4,12 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [react()],
-  base: './',
-  root: path.resolve(__dirname),
+  base: './', // 👈 ESSENCIAL para file://
+  root: path.resolve(__dirname), // 👈 Especificar el directorio raíz
   build: {
-    outDir: '../../build/renderer',
+    outDir: '../../renderer', // 👈 Ruta relativa al directorio raíz del proyecto
+    assetsDir: 'assets',
+    sourcemap: true,
     emptyOutDir: true
   },
   server: {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAppStore } from '../store/useAppStore';
 import { api } from '../lib/api';
 import { formatCurrency } from '../lib/format';
 import Swal from 'sweetalert2';
@@ -6,7 +7,14 @@ import Swal from 'sweetalert2';
 const Config: React.FC = () => {
   const [activeTab, setActiveTab] = useState('empresa');
   const [isLoading, setIsLoading] = useState(false);
-  const [settings, setSettings] = useState<any>({});
+  const [, setSettings] = useState<any>({});
+  
+  // Usar el store centralizado
+  const { config, setVAT, setCurrency } = useAppStore(state => ({
+    config: state.config,
+    setVAT: state.setVAT,
+    setCurrency: state.setCurrency
+  }));
 
   // Configuraciones por sección
   const [empresaConfig, setEmpresaConfig] = useState({
@@ -18,62 +26,53 @@ const Config: React.FC = () => {
   });
 
   const [fiscalConfig, setFiscalConfig] = useState({
-    iva_porcentaje: 19,
-    moneda: 'COP',
-    moneda_simbolo: '$'
+    iva_porcentaje: Math.round(config.vatRate * 100),
+    moneda: config.currency,
+    moneda_simbolo: config.currencySymbol
   });
 
   const [impresoraConfig, setImpresoraConfig] = useState({
-    tipo: 'usb',
     puerto: '',
-    ancho: 58,
     test_print: true
-  });
-
-  const [appConfig, setAppConfig] = useState({
-    tema: 'light',
-    idioma: 'es',
-    auto_backup: true,
-    backup_interval: 24
   });
 
   useEffect(() => {
     loadSettings();
   }, []);
 
+  // Actualizar fiscalConfig cuando cambie el config del store
+  useEffect(() => {
+    setFiscalConfig({
+      iva_porcentaje: Math.round(config.vatRate * 100),
+      moneda: config.currency,
+      moneda_simbolo: config.currencySymbol
+    });
+  }, [config]);
+
   const loadSettings = async () => {
     try {
       setIsLoading(true);
       const allSettings = await api.getAllSettings();
-      setSettings(allSettings);
+      
+      const settingsMap = allSettings.reduce((acc: any, setting: any) => {
+        acc[setting.key] = setting.value;
+        return acc;
+      }, {} as any);
 
-      // Cargar configuraciones específicas
+      setSettings(settingsMap);
+      
+      // Configurar valores por defecto
       setEmpresaConfig({
-        nombre: allSettings.empresa_nombre || '',
-        direccion: allSettings.empresa_direccion || '',
-        telefono: allSettings.empresa_telefono || '',
-        email: allSettings.empresa_email || '',
-        ruc: allSettings.empresa_ruc || ''
-      });
-
-      setFiscalConfig({
-        iva_porcentaje: allSettings.iva_porcentaje || 19,
-        moneda: allSettings.moneda || 'COP',
-        moneda_simbolo: allSettings.moneda_simbolo || '$'
+        nombre: settingsMap.empresa_nombre || '',
+        direccion: settingsMap.empresa_direccion || '',
+        telefono: settingsMap.empresa_telefono || '',
+        email: settingsMap.empresa_email || '',
+        ruc: settingsMap.empresa_ruc || ''
       });
 
       setImpresoraConfig({
-        tipo: allSettings.impresora_tipo || 'usb',
-        puerto: allSettings.impresora_puerto || '',
-        ancho: allSettings.impresora_ancho || 58,
-        test_print: allSettings.impresora_test_print || false
-      });
-
-      setAppConfig({
-        tema: allSettings.tema || 'light',
-        idioma: allSettings.idioma || 'es',
-        auto_backup: allSettings.auto_backup !== false,
-        backup_interval: allSettings.backup_interval || 24
+        puerto: settingsMap.impresora_puerto || '',
+        test_print: settingsMap.impresora_test_print !== false
       });
     } catch (error) {
       console.error('Error al cargar configuraciones:', error);
@@ -88,19 +87,22 @@ const Config: React.FC = () => {
     }
   };
 
-  const handleSaveEmpresa = async () => {
+  const handleSaveEmpresa = useCallback(async () => {
     try {
       setIsLoading(true);
-      await api.setSetting('empresa_nombre', empresaConfig.nombre);
-      await api.setSetting('empresa_direccion', empresaConfig.direccion);
-      await api.setSetting('empresa_telefono', empresaConfig.telefono);
-      await api.setSetting('empresa_email', empresaConfig.email);
-      await api.setSetting('empresa_ruc', empresaConfig.ruc);
-
+      
+      await Promise.all([
+        api.setSetting('empresa_nombre', empresaConfig.nombre),
+        api.setSetting('empresa_direccion', empresaConfig.direccion),
+        api.setSetting('empresa_telefono', empresaConfig.telefono),
+        api.setSetting('empresa_email', empresaConfig.email),
+        api.setSetting('empresa_ruc', empresaConfig.ruc)
+      ]);
+      
       Swal.fire({
         icon: 'success',
         title: 'Configuración guardada',
-        text: 'La información de la empresa se ha guardado correctamente',
+        text: 'La configuración de empresa se ha guardado correctamente',
         confirmButtonText: 'Entendido'
       });
     } catch (error) {
@@ -108,20 +110,34 @@ const Config: React.FC = () => {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'No se pudo guardar la configuración',
+        text: 'No se pudo guardar la configuración de empresa',
         confirmButtonText: 'Entendido'
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [empresaConfig]);
 
-  const handleSaveFiscal = async () => {
+  const handleSaveFiscal = useCallback(async () => {
+    // Validar IVA
+    if (fiscalConfig.iva_porcentaje < 0 || fiscalConfig.iva_porcentaje > 100) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'El porcentaje de IVA debe estar entre 0 y 100',
+        confirmButtonText: 'Entendido'
+      });
+      return;
+    }
+
     try {
       setIsLoading(true);
-      await api.setSetting('iva_porcentaje', fiscalConfig.iva_porcentaje);
-      await api.setSetting('moneda', fiscalConfig.moneda);
-      await api.setSetting('moneda_simbolo', fiscalConfig.moneda_simbolo);
+      
+      // Actualizar IVA usando el store
+      await setVAT(fiscalConfig.iva_porcentaje / 100);
+      
+      // Actualizar moneda usando el store
+      await setCurrency(fiscalConfig.moneda, fiscalConfig.moneda_simbolo);
 
       Swal.fire({
         icon: 'success',
@@ -134,26 +150,27 @@ const Config: React.FC = () => {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'No se pudo guardar la configuración',
+        text: 'No se pudo guardar la configuración fiscal',
         confirmButtonText: 'Entendido'
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fiscalConfig, setVAT, setCurrency]);
 
-  const handleSaveImpresora = async () => {
+  const handleSaveImpresora = useCallback(async () => {
     try {
       setIsLoading(true);
-      await api.setSetting('impresora_tipo', impresoraConfig.tipo);
-      await api.setSetting('impresora_puerto', impresoraConfig.puerto);
-      await api.setSetting('impresora_ancho', impresoraConfig.ancho);
-      await api.setSetting('impresora_test_print', impresoraConfig.test_print);
-
+      
+      await Promise.all([
+        api.setSetting('impresora_puerto', impresoraConfig.puerto),
+        api.setSetting('impresora_test_print', impresoraConfig.test_print)
+      ]);
+      
       Swal.fire({
         icon: 'success',
         title: 'Configuración guardada',
-        text: 'La configuración de la impresora se ha guardado correctamente',
+        text: 'La configuración de impresora se ha guardado correctamente',
         confirmButtonText: 'Entendido'
       });
     } catch (error) {
@@ -161,556 +178,280 @@ const Config: React.FC = () => {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'No se pudo guardar la configuración',
+        text: 'No se pudo guardar la configuración de impresora',
         confirmButtonText: 'Entendido'
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleTestImpresora = async () => {
-    try {
-      setIsLoading(true);
-      const success = await api.testImpresora();
-      
-      if (success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Test exitoso',
-          text: 'La impresora está funcionando correctamente',
-          confirmButtonText: 'Entendido'
-        });
-      } else {
-        throw new Error('Error en el test');
-      }
-    } catch (error) {
-      console.error('Error en test de impresora:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo realizar el test de la impresora',
-        confirmButtonText: 'Entendido'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveApp = async () => {
-    try {
-      setIsLoading(true);
-      await api.setSetting('tema', appConfig.tema);
-      await api.setSetting('idioma', appConfig.idioma);
-      await api.setSetting('auto_backup', appConfig.auto_backup);
-      await api.setSetting('backup_interval', appConfig.backup_interval);
-
-      Swal.fire({
-        icon: 'success',
-        title: 'Configuración guardada',
-        text: 'La configuración de la aplicación se ha guardado correctamente',
-        confirmButtonText: 'Entendido'
-      });
-    } catch (error) {
-      console.error('Error al guardar configuración de app:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo guardar la configuración',
-        confirmButtonText: 'Entendido'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBackupExport = async () => {
-    try {
-      const result = await api.saveFileDialog({
-        title: 'Exportar backup',
-        defaultPath: `backup-${new Date().toISOString().split('T')[0]}.json`,
-        filters: [
-          { name: 'JSON', extensions: ['json'] }
-        ]
-      });
-
-      if (!result.canceled && result.filePath) {
-        setIsLoading(true);
-        const exportResult = await api.exportData(result.filePath);
-        
-        if (exportResult.success) {
-          Swal.fire({
-            icon: 'success',
-            title: 'Backup exportado',
-            text: 'El backup se ha exportado correctamente',
-            confirmButtonText: 'Entendido'
-          });
-        } else {
-          throw new Error(exportResult.error);
-        }
-      }
-    } catch (error) {
-      console.error('Error al exportar backup:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo exportar el backup',
-        confirmButtonText: 'Entendido'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleBackupImport = async () => {
-    try {
-      const result = await api.openFileDialog({
-        title: 'Importar backup',
-        filters: [
-          { name: 'JSON', extensions: ['json'] }
-        ],
-        properties: ['openFile']
-      });
-
-      if (!result.canceled && result.filePaths.length > 0) {
-        const filePath = result.filePaths[0];
-        
-        const confirmResult = await Swal.fire({
-          title: 'Importar backup',
-          text: '¿Está seguro de importar este backup? Esto sobrescribirá los datos actuales.',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Sí, importar',
-          cancelButtonText: 'Cancelar',
-          confirmButtonColor: '#dc3545'
-        });
-
-        if (confirmResult.isConfirmed) {
-          setIsLoading(true);
-          const importResult = await api.importData(filePath);
-          
-          if (importResult.success) {
-            Swal.fire({
-              icon: 'success',
-              title: 'Backup importado',
-              text: 'El backup se ha importado correctamente',
-              confirmButtonText: 'Entendido'
-            });
-            loadSettings();
-          } else {
-            throw new Error(importResult.error);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error al importar backup:', error);
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'No se pudo importar el backup',
-        confirmButtonText: 'Entendido'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const tabs = [
-    { id: 'empresa', label: 'Empresa', icon: 'bi-building' },
-    { id: 'fiscal', label: 'Fiscal', icon: 'bi-calculator' },
-    { id: 'impresora', label: 'Impresora', icon: 'bi-printer' },
-    { id: 'app', label: 'Aplicación', icon: 'bi-gear' },
-    { id: 'backup', label: 'Backup', icon: 'bi-cloud-arrow-down' }
-  ];
-
-  if (isLoading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ height: '400px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Cargando...</span>
-        </div>
-      </div>
-    );
-  }
+  }, [impresoraConfig]);
 
   return (
-    <div>
-      {/* Header */}
-      <div className="header">
-        <div className="d-flex justify-content-between align-items-center">
-          <div>
-            <h1>Configuración</h1>
-            <p className="text-muted mb-0">Ajustes del sistema</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="container-fluid">
       <div className="row">
-        {/* Navegación de pestañas */}
-        <div className="col-lg-3">
+        <div className="col-12">
           <div className="card">
-            <div className="card-body p-0">
-              <div className="list-group list-group-flush">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    className={`list-group-item list-group-item-action d-flex align-items-center ${
-                      activeTab === tab.id ? 'active' : ''
-                    }`}
-                    onClick={() => setActiveTab(tab.id)}
-                  >
-                    <i className={`${tab.icon} me-2`}></i>
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
+            <div className="card-header">
+              <h4 className="mb-0">
+                <i className="bi bi-gear me-2"></i>
+                Configuración del Sistema
+              </h4>
             </div>
-          </div>
-        </div>
+            <div className="card-body">
+              {/* Navegación por pestañas */}
+              <ul className="nav nav-tabs mb-4">
+                <li className="nav-item">
+                  <button
+                    className={`nav-link ${activeTab === 'empresa' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('empresa')}
+                    style={{ 
+                      backgroundColor: activeTab === 'empresa' ? '#0d6efd' : '#f8f9fa',
+                      color: activeTab === 'empresa' ? '#fff' : '#000',
+                      border: '1px solid #dee2e6',
+                      borderBottom: activeTab === 'empresa' ? '1px solid #0d6efd' : '1px solid #dee2e6'
+                    }}
+                  >
+                    <i className="bi bi-building me-2"></i>
+                    Empresa
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button
+                    className={`nav-link ${activeTab === 'fiscal' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('fiscal')}
+                    style={{ 
+                      backgroundColor: activeTab === 'fiscal' ? '#0d6efd' : '#f8f9fa',
+                      color: activeTab === 'fiscal' ? '#fff' : '#000',
+                      border: '1px solid #dee2e6',
+                      borderBottom: activeTab === 'fiscal' ? '1px solid #0d6efd' : '1px solid #dee2e6'
+                    }}
+                  >
+                    <i className="bi bi-calculator me-2"></i>
+                    Configuración Fiscal
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button
+                    className={`nav-link ${activeTab === 'impresora' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('impresora')}
+                    style={{ 
+                      backgroundColor: activeTab === 'impresora' ? '#0d6efd' : '#f8f9fa',
+                      color: activeTab === 'impresora' ? '#fff' : '#000',
+                      border: '1px solid #dee2e6',
+                      borderBottom: activeTab === 'impresora' ? '1px solid #0d6efd' : '1px solid #dee2e6'
+                    }}
+                  >
+                    <i className="bi bi-printer me-2"></i>
+                    Impresora
+                  </button>
+                </li>
+              </ul>
 
-        {/* Contenido de las pestañas */}
-        <div className="col-lg-9">
-          {/* Empresa */}
-          {activeTab === 'empresa' && (
-            <div className="card">
-              <div className="card-header">
-                <h5 className="mb-0">
-                  <i className="bi bi-building me-2"></i>
-                  Información de la Empresa
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-12">
-                    <label className="form-label">Nombre de la Empresa *</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={empresaConfig.nombre}
-                      onChange={(e) => setEmpresaConfig({ ...empresaConfig, nombre: e.target.value })}
-                      placeholder="Nombre de la empresa"
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label">Dirección</label>
-                    <textarea
-                      className="form-control"
-                      rows={3}
-                      value={empresaConfig.direccion}
-                      onChange={(e) => setEmpresaConfig({ ...empresaConfig, direccion: e.target.value })}
-                      placeholder="Dirección de la empresa"
-                    />
-                  </div>
+              {/* Contenido de pestañas */}
+              {activeTab === 'empresa' && (
+                <div className="row">
                   <div className="col-md-6">
-                    <label className="form-label">Teléfono</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={empresaConfig.telefono}
-                      onChange={(e) => setEmpresaConfig({ ...empresaConfig, telefono: e.target.value })}
-                      placeholder="Número de teléfono"
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Email</label>
-                    <input
-                      type="email"
-                      className="form-control"
-                      value={empresaConfig.email}
-                      onChange={(e) => setEmpresaConfig({ ...empresaConfig, email: e.target.value })}
-                      placeholder="Correo electrónico"
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">RUC</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={empresaConfig.ruc}
-                      onChange={(e) => setEmpresaConfig({ ...empresaConfig, ruc: e.target.value })}
-                      placeholder="Número de RUC"
-                    />
+                    <h5>Información de la Empresa</h5>
+                    <div className="mb-3">
+                      <label className="form-label">Nombre de la Empresa</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={empresaConfig.nombre}
+                        onChange={(e) => setEmpresaConfig({...empresaConfig, nombre: e.target.value})}
+                        placeholder="Ingrese el nombre de la empresa"
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Dirección</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={empresaConfig.direccion}
+                        onChange={(e) => setEmpresaConfig({...empresaConfig, direccion: e.target.value})}
+                        placeholder="Ingrese la dirección"
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Teléfono</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={empresaConfig.telefono}
+                        onChange={(e) => setEmpresaConfig({...empresaConfig, telefono: e.target.value})}
+                        placeholder="Ingrese el teléfono"
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Email</label>
+                      <input
+                        type="email"
+                        className="form-control"
+                        value={empresaConfig.email}
+                        onChange={(e) => setEmpresaConfig({...empresaConfig, email: e.target.value})}
+                        placeholder="Ingrese el email"
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">RUC</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={empresaConfig.ruc}
+                        onChange={(e) => setEmpresaConfig({...empresaConfig, ruc: e.target.value})}
+                        placeholder="Ingrese el RUC"
+                      />
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSaveEmpresa}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-lg me-2"></i>
+                          Guardar Configuración
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
-                <div className="mt-3">
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSaveEmpresa}
-                  >
-                    <i className="bi bi-check me-2"></i>
-                    Guardar Configuración
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Fiscal */}
-          {activeTab === 'fiscal' && (
-            <div className="card">
-              <div className="card-header">
-                <h5 className="mb-0">
-                  <i className="bi bi-calculator me-2"></i>
-                  Configuración Fiscal
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
+              {activeTab === 'fiscal' && (
+                <div className="row">
                   <div className="col-md-6">
-                    <label className="form-label">Porcentaje de IVA</label>
-                    <div className="input-group">
+                    <h5>Configuración Fiscal</h5>
+                    <div className="mb-3">
+                      <label className="form-label">Porcentaje de IVA</label>
                       <input
                         type="number"
                         className="form-control"
-                        value={fiscalConfig.iva_porcentaje}
-                        onChange={(e) => setFiscalConfig({ ...fiscalConfig, iva_porcentaje: Number(e.target.value) })}
                         min="0"
                         max="100"
-                        step="0.01"
+                        value={fiscalConfig.iva_porcentaje}
+                        onChange={(e) => setFiscalConfig({...fiscalConfig, iva_porcentaje: parseInt(e.target.value) || 0})}
+                        placeholder="Ingrese el porcentaje de IVA"
                       />
-                      <span className="input-group-text">%</span>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Moneda</label>
-                    <select
-                      className="form-select"
-                      value={fiscalConfig.moneda}
-                      onChange={(e) => setFiscalConfig({ ...fiscalConfig, moneda: e.target.value })}
-                    >
-                      <option value="COP">Peso Colombiano (COP)</option>
-                      <option value="USD">Dólar Americano (USD)</option>
-                      <option value="EUR">Euro (EUR)</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Símbolo de Moneda</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={fiscalConfig.moneda_simbolo}
-                      onChange={(e) => setFiscalConfig({ ...fiscalConfig, moneda_simbolo: e.target.value })}
-                      placeholder="$"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSaveFiscal}
-                  >
-                    <i className="bi bi-check me-2"></i>
-                    Guardar Configuración
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Impresora */}
-          {activeTab === 'impresora' && (
-            <div className="card">
-              <div className="card-header">
-                <h5 className="mb-0">
-                  <i className="bi bi-printer me-2"></i>
-                  Configuración de Impresora
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label">Tipo de Impresora</label>
-                    <select
-                      className="form-select"
-                      value={impresoraConfig.tipo}
-                      onChange={(e) => setImpresoraConfig({ ...impresoraConfig, tipo: e.target.value })}
-                    >
-                      <option value="usb">USB</option>
-                      <option value="ethernet">Ethernet/Red</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Puerto/IP</label>
-                    <input
-                      type="text"
-                      className="form-control"
-                      value={impresoraConfig.puerto}
-                      onChange={(e) => setImpresoraConfig({ ...impresoraConfig, puerto: e.target.value })}
-                      placeholder={impresoraConfig.tipo === 'usb' ? 'Puerto USB' : 'IP de la impresora'}
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Ancho de Papel</label>
-                    <select
-                      className="form-select"
-                      value={impresoraConfig.ancho}
-                      onChange={(e) => setImpresoraConfig({ ...impresoraConfig, ancho: Number(e.target.value) })}
-                    >
-                      <option value={58}>58mm</option>
-                      <option value={80}>80mm</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Test de Impresión</label>
-                    <div className="form-check form-switch">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="testPrint"
-                        checked={impresoraConfig.test_print}
-                        onChange={(e) => setImpresoraConfig({ ...impresoraConfig, test_print: e.target.checked })}
-                      />
-                      <label className="form-check-label" htmlFor="testPrint">
-                        Habilitar test automático
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <button
-                    className="btn btn-primary me-2"
-                    onClick={handleSaveImpresora}
-                  >
-                    <i className="bi bi-check me-2"></i>
-                    Guardar Configuración
-                  </button>
-                  <button
-                    className="btn btn-outline-secondary"
-                    onClick={handleTestImpresora}
-                  >
-                    <i className="bi bi-printer me-2"></i>
-                    Test de Impresión
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Aplicación */}
-          {activeTab === 'app' && (
-            <div className="card">
-              <div className="card-header">
-                <h5 className="mb-0">
-                  <i className="bi bi-gear me-2"></i>
-                  Configuración de la Aplicación
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label">Tema</label>
-                    <select
-                      className="form-select"
-                      value={appConfig.tema}
-                      onChange={(e) => setAppConfig({ ...appConfig, tema: e.target.value })}
-                    >
-                      <option value="light">Claro</option>
-                      <option value="dark">Oscuro</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Idioma</label>
-                    <select
-                      className="form-select"
-                      value={appConfig.idioma}
-                      onChange={(e) => setAppConfig({ ...appConfig, idioma: e.target.value })}
-                    >
-                      <option value="es">Español</option>
-                      <option value="en">English</option>
-                    </select>
-                  </div>
-                  <div className="col-12">
-                    <div className="form-check form-switch">
-                      <input
-                        className="form-check-input"
-                        type="checkbox"
-                        id="autoBackup"
-                        checked={appConfig.auto_backup}
-                        onChange={(e) => setAppConfig({ ...appConfig, auto_backup: e.target.checked })}
-                      />
-                      <label className="form-check-label" htmlFor="autoBackup">
-                        Backup automático
-                      </label>
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Intervalo de Backup (horas)</label>
-                    <input
-                      type="number"
-                      className="form-control"
-                      value={appConfig.backup_interval}
-                      onChange={(e) => setAppConfig({ ...appConfig, backup_interval: Number(e.target.value) })}
-                      min="1"
-                      max="168"
-                    />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSaveApp}
-                  >
-                    <i className="bi bi-check me-2"></i>
-                    Guardar Configuración
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Backup */}
-          {activeTab === 'backup' && (
-            <div className="card">
-              <div className="card-header">
-                <h5 className="mb-0">
-                  <i className="bi bi-cloud-arrow-down me-2"></i>
-                  Gestión de Backup
-                </h5>
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-12">
-                    <div className="alert alert-info">
-                      <i className="bi bi-info-circle me-2"></i>
-                      Los backups incluyen todos los datos: productos, órdenes, configuraciones y reportes.
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="card">
-                      <div className="card-body text-center">
-                        <i className="bi bi-upload display-4 text-primary mb-3"></i>
-                        <h5>Exportar Backup</h5>
-                        <p className="text-muted">Crear una copia de seguridad de todos los datos</p>
-                        <button
-                          className="btn btn-primary"
-                          onClick={handleBackupExport}
-                        >
-                          <i className="bi bi-download me-2"></i>
-                          Exportar
-                        </button>
+                      <div className="form-text">
+                        El porcentaje de IVA debe estar entre 0 y 100
                       </div>
                     </div>
+                    <div className="mb-3">
+                      <label className="form-label">Moneda</label>
+                      <select
+                        className="form-select"
+                        value={fiscalConfig.moneda}
+                        onChange={(e) => setFiscalConfig({...fiscalConfig, moneda: e.target.value})}
+                      >
+                        <option value="ARS">Peso Argentino (ARS)</option>
+                        <option value="USD">Dólar Americano (USD)</option>
+                      </select>
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label">Símbolo de Moneda</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={fiscalConfig.moneda_simbolo}
+                        onChange={(e) => setFiscalConfig({...fiscalConfig, moneda_simbolo: e.target.value})}
+                        placeholder="Ingrese el símbolo de la moneda"
+                      />
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSaveFiscal}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-lg me-2"></i>
+                          Guardar Configuración
+                        </>
+                      )}
+                    </button>
                   </div>
                   <div className="col-md-6">
-                    <div className="card">
-                      <div className="card-body text-center">
-                        <i className="bi bi-download display-4 text-success mb-3"></i>
-                        <h5>Importar Backup</h5>
-                        <p className="text-muted">Restaurar datos desde un archivo de backup</p>
-                        <button
-                          className="btn btn-success"
-                          onClick={handleBackupImport}
-                        >
-                          <i className="bi bi-upload me-2"></i>
-                          Importar
-                        </button>
+                    <div className="card bg-light">
+                      <div className="card-body">
+                        <h6 className="card-title">Vista Previa</h6>
+                        <p className="card-text">
+                          <strong>IVA:</strong> {fiscalConfig.iva_porcentaje}%
+                        </p>
+                        <p className="card-text">
+                          <strong>Moneda:</strong> {fiscalConfig.moneda}
+                        </p>
+                        <p className="card-text">
+                          <strong>Símbolo:</strong> {fiscalConfig.moneda_simbolo}
+                        </p>
+                        <p className="card-text">
+                          <strong>Ejemplo:</strong> {formatCurrency(1000, fiscalConfig.moneda_simbolo)}
+                        </p>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {activeTab === 'impresora' && (
+                <div className="row">
+                  <div className="col-md-6">
+                    <h5>Configuración de Impresora</h5>
+                    <div className="mb-3">
+                      <label className="form-label">Puerto de Impresora</label>
+                      <input
+                        type="text"
+                        className="form-control"
+                        value={impresoraConfig.puerto}
+                        onChange={(e) => setImpresoraConfig({...impresoraConfig, puerto: e.target.value})}
+                        placeholder="Ej: COM1, USB, etc."
+                      />
+                    </div>
+                    <div className="mb-3">
+                      <div className="form-check">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          checked={impresoraConfig.test_print}
+                          onChange={(e) => setImpresoraConfig({...impresoraConfig, test_print: e.target.checked})}
+                        />
+                        <label className="form-check-label">
+                          Modo de prueba (simular impresión)
+                        </label>
+                      </div>
+                    </div>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleSaveImpresora}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <span className="spinner-border spinner-border-sm me-2"></span>
+                          Guardando...
+                        </>
+                      ) : (
+                        <>
+                          <i className="bi bi-check-lg me-2"></i>
+                          Guardar Configuración
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

@@ -1,93 +1,131 @@
-const Store = require('electron-store');
+const path = require('path');
+const fs = require('fs');
 
-// Configuración por defecto
-const defaultSettings = {
-  // Información de la empresa
-  empresa_nombre: 'Mi Restaurante',
-  empresa_direccion: 'Dirección del restaurante',
-  empresa_telefono: '',
-  empresa_email: '',
-  empresa_ruc: '',
-  
-  // Configuración fiscal
-  iva_porcentaje: 19,
-  moneda: 'COP',
-  moneda_simbolo: '$',
-  
-  // Configuración de impresora
-  impresora_tipo: 'usb', // usb | ethernet
-  impresora_puerto: '',
-  impresora_ancho: 58, // 58 | 80
-  impresora_test_print: true,
-  
-  // Configuración de la aplicación
-  tema: 'light', // light | dark
-  idioma: 'es',
-  auto_backup: true,
-  backup_interval: 24, // horas
-  
-  // Configuración de caja
-  caja_monto_minimo: 0,
-  caja_requiere_responsable: true,
-  
-  // Configuración de productos
-  productos_mostrar_stock: true,
-  productos_mostrar_categoria: true,
-  productos_ordenar_por: 'nombre', // nombre | categoria | precio
-  
-  // Configuración de reportes
-  reportes_mostrar_graficos: true,
-  reportes_exportar_formato: 'pdf', // pdf | excel | csv
-  
-  // Configuración de tickets
-  ticket_mostrar_logo: false,
-  ticket_mostrar_observaciones: true,
-  ticket_mostrar_desglose_iva: true,
-  
-  // Configuración de cocina
-  cocina_imprimir_automatico: true,
-  cocina_mostrar_observaciones: true,
-  
-  // Configuración de backup
-  backup_ubicacion: '',
-  backup_automatico: true,
-  backup_retener_dias: 30
-};
+// Resolver ruta de dependencias para aplicación empaquetada
+function resolveNodeModule(moduleName) {
+  const possiblePaths = [
+    path.join(__dirname, '../../node_modules', moduleName),
+    path.join(__dirname, '../../../resources/node_modules', moduleName),
+    path.join(process.resourcesPath, 'node_modules', moduleName)
+  ];
 
-// Inicializar store
-const store = new Store({
-  defaults: defaultSettings,
-  name: 'birthday-pos-settings',
-  fileExtension: 'json'
-});
+  for (const modulePath of possiblePaths) {
+    if (fs.existsSync(modulePath)) {
+      return modulePath;
+    }
+  }
+
+  // Fallback a require normal
+  return moduleName;
+}
+
+const low = require(resolveNodeModule('lowdb'));
+const FileSync = require(resolveNodeModule('lowdb/adapters/FileSync'));
+
+let db;
+
+// Inicializar base de datos de configuraciones
+function initSettings() {
+  return new Promise((resolve, reject) => {
+    try {
+      const dbPath = path.join(__dirname, '../../db/database.json');
+      
+      // Crear directorio si no existe
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+
+      // Crear archivo de base de datos si no existe
+      if (!fs.existsSync(dbPath)) {
+        const initialData = {
+          settings: [],
+          caja: [],
+          productos: [],
+          ordenes: [],
+          orden_items: [],
+          pagos: [],
+          kitchen_tickets: []
+        };
+        fs.writeFileSync(dbPath, JSON.stringify(initialData, null, 2));
+      }
+
+      const adapter = new FileSync(dbPath);
+      db = low(adapter);
+
+      // Establecer valores por defecto
+      db.defaults({
+        settings: [
+          { key: 'iva_porcentaje', value: 19 },
+          { key: 'moneda', value: 'ARS' },
+          { key: 'moneda_simbolo', value: '$' }
+        ],
+        caja: [],
+        productos: [],
+        ordenes: [],
+        orden_items: [],
+        pagos: [],
+        kitchen_tickets: []
+      }).write();
+
+      console.log('Base de datos de configuraciones inicializada correctamente');
+      resolve();
+    } catch (error) {
+      console.error('Error al inicializar la base de datos de configuraciones:', error);
+      reject(error);
+    }
+  });
+}
 
 // Obtener configuración
 function get(key) {
-  return store.get(key);
+  if (!db) {
+    console.error('Base de datos no inicializada');
+    return null;
+  }
+  const setting = db.get('settings').find({ key }).value();
+  return setting ? setting.value : null;
 }
 
 // Establecer configuración
 function set(key, value) {
-  store.set(key, value);
+  if (!db) {
+    console.error('Base de datos no inicializada');
+    return false;
+  }
+  
+  const existing = db.get('settings').find({ key }).value();
+  
+  if (existing) {
+    db.get('settings').find({ key }).assign({ value }).write();
+  } else {
+    db.get('settings').push({ key, value }).write();
+  }
+  console.log(`Configuración guardada: ${key} = ${value}`);
   return true;
 }
 
 // Obtener todas las configuraciones
 function getAll() {
-  return store.store;
+  if (!db) {
+    console.error('Base de datos no inicializada');
+    return [];
+  }
+  const settings = db.get('settings').value();
+  return settings || [];
 }
 
 // Establecer múltiples configuraciones
 function setMultiple(settings) {
   for (const [key, value] of Object.entries(settings)) {
-    store.set(key, value);
+    set(key, value);
   }
   return true;
 }
 
 // Resetear configuración a valores por defecto
 function reset() {
-  store.clear();
+  db.get('settings').remove().write();
   return true;
 }
 
@@ -335,6 +373,7 @@ function importConfig(config) {
 
 module.exports = {
   // Métodos básicos
+  initSettings,
   get,
   set,
   getAll,
