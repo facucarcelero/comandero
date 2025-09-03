@@ -1,0 +1,115 @@
+# =========================
+# Node / Frontend General
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# =========================
+# Build & Artifacts
+# =========================
+build/
+dist/
+dist-electron/
+release/
+out/
+*.tgz
+
+# =========================
+# Env files (mantén un .env.example)
+# =========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Runtime / Misc
+# =========================
+pids/
+*.pid
+*.seed
+*.pid.lock
+.npm
+.node_repl_history
+.yarn-integrity
+
+# =========================
+# Coverage / Tests
+# =========================
+coverage/
+.nyc_output/
+
+# =========================
+# Bundlers / Caches
+# =========================
+.cache
+.parcel-cache
+.next
+.nuxt
+.vuepress/dist
+.serverless
+.fusebox/
+.dynamodb/
+.tern-port
+jspm_packages/
+
+# =========================
+# Electron (builder/forge) outputs
+# =========================
+win-unpacked/
+linux-unpacked/
+mac/
+mac-arm64/
+*.blockmap
+latest*.yml
+
+# =========================
+# Instaladores y binarios (NO versionar)
+# =========================
+*.exe
+*.msi
+*.dmg
+*.pkg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.zip
+
+# =========================
+# Backups
+# =========================
+backups/
+*.backup
+
+# =========================
+# Paths específicos del proyecto
+# =========================
+campo-pos/release/
+campo-pos/win-unpacked/
+campo-pos/*.zip
+campo-pos/*.exe
+campo-pos/*.msi
+campo-pos/*.dmg
+campo-pos/*.AppImage
+campo-pos/*.deb
+campo-pos/*.rpm
